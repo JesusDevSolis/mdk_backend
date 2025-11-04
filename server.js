@@ -103,12 +103,39 @@ app.get('/api/images/logos/:filename', (req, res) => {
     res.sendFile(imagePath);
 });
 
+// Endpoint para imágenes de perfiles
+app.get('/api/images/profiles/:filename', (req, res) => {
+    const { filename } = req.params;
+    const imagePath = path.join(__dirname, 'uploads', 'profiles', filename);
+    
+    // Headers súper permisivos
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.header('Cache-Control', 'no-cache');
+    
+    // Verificar si el archivo existe
+    const fs = require('fs');
+    if (!fs.existsSync(imagePath)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Imagen no encontrada'
+        });
+    }
+    
+    // Servir la imagen
+    res.sendFile(imagePath);
+});
+
 // Ruta de prueba
 app.get('/', (req, res) => {
     res.json({ 
         message: 'API del Sistema de Taekwondo funcionando correctamente',
-        version: '1.0.0',
-        status: 'active'
+        version: '2.0.0',
+        status: 'active',
+        modules: ['auth', 'sucursales', 'tutores', 'alumnos']
     });
 });
 
@@ -117,13 +144,21 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        modules: {
+            auth: 'active',
+            sucursales: 'active',
+            tutores: 'active',
+            alumnos: 'active'
+        }
     });
 });
 
 // Rutas de la API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sucursales', require('./routes/sucursales'));
+app.use('/api/tutores', require('./routes/tutores'));      // NUEVA RUTA
+app.use('/api/alumnos', require('./routes/alumnos'));      // NUEVA RUTA
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
@@ -147,8 +182,10 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📡 API disponible en: http://localhost:${PORT}`);
-    console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/logos/`);
-    console.log(`🖼️  API Imágenes: http://localhost:${PORT}/api/images/logos/`);
+    console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
+    console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
+    console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
+    console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos`);
 });
 
 module.exports = app;

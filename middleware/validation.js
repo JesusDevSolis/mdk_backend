@@ -1,4 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 
 // Middleware para manejar errores de validación
 const handleValidationErrors = (req, res, next) => {
@@ -190,7 +191,8 @@ const validateUserQuery = [
   handleValidationErrors
 ];
 
-// Validaciones para sucursales
+// ===== VALIDACIONES DE SUCURSALES =====
+
 const validateSucursal = [
   body('name')
     .trim()
@@ -222,16 +224,169 @@ const validateSucursal = [
   handleValidationErrors
 ];
 
-// Validaciones para alumnos
-const validateAlumno = [
-  body('name')
+// ===== VALIDACIONES PARA TUTORES =====
+
+const validateTutor = [
+  body('firstName')
     .trim()
     .notEmpty()
-    .withMessage('El nombre del alumno es requerido')
+    .withMessage('El nombre es requerido')
     .isLength({ min: 2, max: 50 })
     .withMessage('El nombre debe tener entre 2 y 50 caracteres')
     .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
     .withMessage('El nombre solo puede contener letras y espacios'),
+
+  body('lastName')
+    .trim()
+    .notEmpty()
+    .withMessage('Los apellidos son requeridos')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Los apellidos deben tener entre 2 y 50 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('Los apellidos solo pueden contener letras y espacios'),
+
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('El email es requerido')
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .normalizeEmail(),
+
+  body('identification.type')
+    .notEmpty()
+    .withMessage('El tipo de identificación es requerido')
+    .isIn(['cedula', 'pasaporte', 'licencia', 'otro'])
+    .withMessage('Tipo de identificación inválido'),
+
+  body('identification.number')
+    .trim()
+    .notEmpty()
+    .withMessage('El número de identificación es requerido')
+    .isLength({ min: 5, max: 20 })
+    .withMessage('El número de identificación debe tener entre 5 y 20 caracteres'),
+
+  body('phones.primary')
+    .trim()
+    .notEmpty()
+    .withMessage('El teléfono principal es requerido')
+    .isMobilePhone('es-MX')
+    .withMessage('El teléfono principal debe tener un formato válido'),
+
+  body('address.street')
+    .trim()
+    .notEmpty()
+    .withMessage('La calle es requerida')
+    .isLength({ max: 100 })
+    .withMessage('La calle no puede exceder 100 caracteres'),
+
+  body('address.neighborhood')
+    .trim()
+    .notEmpty()
+    .withMessage('La colonia es requerida')
+    .isLength({ max: 50 })
+    .withMessage('La colonia no puede exceder 50 caracteres'),
+
+  body('address.city')
+    .trim()
+    .notEmpty()
+    .withMessage('La ciudad es requerida')
+    .isLength({ max: 50 })
+    .withMessage('La ciudad no puede exceder 50 caracteres'),
+
+  body('address.state')
+    .trim()
+    .notEmpty()
+    .withMessage('El estado es requerido')
+    .isLength({ max: 50 })
+    .withMessage('El estado no puede exceder 50 caracteres'),
+
+  body('address.zipCode')
+    .trim()
+    .notEmpty()
+    .withMessage('El código postal es requerido')
+    .isLength({ min: 5, max: 10 })
+    .withMessage('El código postal debe tener entre 5 y 10 caracteres'),
+
+  body('dateOfBirth')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de nacimiento debe tener un formato válido')
+    .custom(value => {
+      if (!value) return true;
+      const birthDate = new Date(value);
+      const today = new Date();
+      const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+      
+      if (birthDate > eighteenYearsAgo) {
+        throw new Error('El tutor debe ser mayor de 18 años');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+const validateTutorUpdate = [
+  body('firstName')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre no puede estar vacío')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('El nombre debe tener entre 2 y 50 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo puede contener letras y espacios'),
+
+  body('lastName')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Los apellidos no pueden estar vacíos')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Los apellidos deben tener entre 2 y 50 caracteres'),
+
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .normalizeEmail(),
+
+  body('identification.type')
+    .optional()
+    .isIn(['cedula', 'pasaporte', 'licencia', 'otro'])
+    .withMessage('Tipo de identificación inválido'),
+
+  body('identification.number')
+    .optional()
+    .trim()
+    .isLength({ min: 5, max: 20 })
+    .withMessage('El número de identificación debe tener entre 5 y 20 caracteres'),
+
+  handleValidationErrors
+];
+
+// ===== VALIDACIONES PARA ALUMNOS =====
+
+const validateAlumno = [
+  body('firstName')
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre es requerido')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('El nombre debe tener entre 2 y 50 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo puede contener letras y espacios'),
+
+  body('lastName')
+    .trim()
+    .notEmpty()
+    .withMessage('Los apellidos son requeridos')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Los apellidos deben tener entre 2 y 50 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('Los apellidos solo pueden contener letras y espacios'),
 
   body('dateOfBirth')
     .notEmpty()
@@ -249,32 +404,134 @@ const validateAlumno = [
       return true;
     }),
 
-  body('sucursal')
+  body('gender')
+    .notEmpty()
+    .withMessage('El género es requerido')
+    .isIn(['masculino', 'femenino', 'otro'])
+    .withMessage('El género debe ser: masculino, femenino u otro'),
+
+  body('enrollment.sucursal')
     .notEmpty()
     .withMessage('La sucursal es requerida')
     .isMongoId()
     .withMessage('ID de sucursal inválido'),
 
-  body('tutor')
-    .notEmpty()
-    .withMessage('El tutor es requerido')
-    .isMongoId()
-    .withMessage('ID de tutor inválido'),
-
   body('emergencyContact.name')
-    .optional()
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('El nombre del contacto de emergencia debe tener entre 2 y 50 caracteres'),
+    .notEmpty()
+    .withMessage('El nombre del contacto de emergencia es requerido')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('El nombre del contacto debe tener entre 2 y 100 caracteres'),
+
+  body('emergencyContact.relationship')
+    .trim()
+    .notEmpty()
+    .withMessage('La relación del contacto de emergencia es requerida')
+    .isLength({ max: 50 })
+    .withMessage('La relación no puede exceder 50 caracteres'),
 
   body('emergencyContact.phone')
-    .optional()
     .trim()
+    .notEmpty()
+    .withMessage('El teléfono del contacto de emergencia es requerido')
     .isMobilePhone('es-MX')
     .withMessage('El teléfono del contacto de emergencia debe tener un formato válido'),
 
+  body('tutor')
+    .optional()
+    .isMongoId()
+    .withMessage('ID de tutor inválido'),
+
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .normalizeEmail(),
+
   handleValidationErrors
 ];
+
+const validateAlumnoUpdate = [
+  body('firstName')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre no puede estar vacío')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('El nombre debe tener entre 2 y 50 caracteres')
+    .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/)
+    .withMessage('El nombre solo puede contener letras y espacios'),
+
+  body('lastName')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Los apellidos no pueden estar vacíos')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Los apellidos deben tener entre 2 y 50 caracteres'),
+
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('El email debe tener un formato válido')
+    .normalizeEmail(),
+
+  body('gender')
+    .optional()
+    .isIn(['masculino', 'femenino', 'otro'])
+    .withMessage('El género debe ser: masculino, femenino u otro'),
+
+  body('enrollment.sucursal')
+    .optional()
+    .isMongoId()
+    .withMessage('ID de sucursal inválido'),
+
+  body('tutor')
+    .optional()
+    .isMongoId()
+    .withMessage('ID de tutor inválido'),
+
+  handleValidationErrors
+];
+
+// Validación específica para actualización de cinturón
+const validateBeltUpdate = [
+  body('level')
+    .optional()
+    .isIn([
+      'blanco', 'blanco-amarillo', 'amarillo', 'amarillo-naranja', 'naranja',
+      'naranja-verde', 'verde', 'verde-azul', 'azul', 'azul-marron', 'marron',
+      'marron-negro', 'negro-1', 'negro-2', 'negro-3', 'negro-4', 'negro-5',
+      'negro-6', 'negro-7', 'negro-8', 'negro-9'
+    ])
+    .withMessage('Nivel de cinturón inválido'),
+
+  body('dateObtained')
+    .optional()
+    .isISO8601()
+    .withMessage('La fecha de obtención debe tener un formato válido')
+    .custom(value => {
+      if (!value) return true;
+      const date = new Date(value);
+      const today = new Date();
+      
+      if (date > today) {
+        throw new Error('La fecha de obtención no puede ser futura');
+      }
+      return true;
+    }),
+
+  body('certifiedBy')
+    .optional()
+    .isMongoId()
+    .withMessage('ID de instructor certificador inválido'),
+
+  handleValidationErrors
+];
+
+// ===== MIDDLEWARE UTILITIES =====
 
 // Middleware para sanitizar datos de entrada
 const sanitizeInput = (req, res, next) => {
@@ -344,16 +601,29 @@ const validateFileType = (allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'
 };
 
 module.exports = {
+  // Utilities
   handleValidationErrors,
+  sanitizeInput,
+  validateFileSize,
+  validateFileType,
+  validateMongoId,
+  
+  // Validaciones de usuarios
   validateRegister,
   validateLogin,
   validateChangePassword,
   validateUpdateProfile,
-  validateMongoId,
   validateUserQuery,
+  
+  // Validaciones de sucursales
   validateSucursal,
+  
+  // Validaciones de tutores
+  validateTutor,
+  validateTutorUpdate,
+  
+  // Validaciones de alumnos
   validateAlumno,
-  sanitizeInput,
-  validateFileSize,
-  validateFileType
+  validateAlumnoUpdate,
+  validateBeltUpdate
 };
