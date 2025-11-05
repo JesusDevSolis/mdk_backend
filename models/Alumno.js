@@ -100,7 +100,7 @@ const alumnoSchema = new mongoose.Schema({
   // Relación con el tutor
   relationshipToTutor: {
     type: String,
-    enum: ['hijo', 'hija', 'pupilo', 'otro'],
+    enum: ['hijo', 'hija', 'pupilo', 'padre', 'madre', 'tutor', 'abuelo', 'hermano', 'otro'],
     required: function() {
       return this.tutor ? true : false;
     }
@@ -435,8 +435,20 @@ alumnoSchema.methods.getPublicInfo = function() {
     lastName: this.lastName,
     age: this.age,
     isMinor: this.isMinor,
+
+    dateOfBirth: this.dateOfBirth,
+    gender: this.gender,
     email: this.email,
     phone: this.phone,
+
+    address: this.address,
+    tutor: this.tutor,
+    relationshipToTutor: this.relationshipToTutor,
+    emergencyContact: this.emergencyContact,
+    medicalInfo: this.medicalInfo,
+    preferences: this.preferences,
+    notes: this.notes,
+
     profilePhotoUrl: this.profilePhotoUrl,
     belt: this.belt,
     enrollment: this.enrollment,
@@ -445,7 +457,7 @@ alumnoSchema.methods.getPublicInfo = function() {
     relationshipToTutor: this.relationshipToTutor,
     isActive: this.isActive,
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    updatedAt: this.updatedAt,
   };
 };
 

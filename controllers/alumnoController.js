@@ -165,26 +165,68 @@ const getAlumnos = async (req, res) => {
 
     // Convertir a datos públicos
     const alumnosPublicos = alumnos.map(alumno => {
-      if (typeof alumno.getPublicInfo === 'function') {
-        return alumno.getPublicInfo();
-      } else {
-        // Para resultados de agregación
-        return {
-          _id: alumno._id,
-          fullName: `${alumno.firstName} ${alumno.lastName}`,
-          firstName: alumno.firstName,
-          lastName: alumno.lastName,
-          email: alumno.email,
-          phone: alumno.phone,
-          belt: alumno.belt,
-          enrollment: alumno.enrollment,
-          stats: alumno.stats,
-          isActive: alumno.isActive,
-          createdAt: alumno.createdAt,
-          sucursalInfo: alumno.sucursalInfo?.[0],
-          tutorInfo: alumno.tutorInfo?.[0]
-        };
-      }
+        if (typeof alumno.getPublicInfo === 'function') {
+            return alumno.getPublicInfo();
+        } else {
+            return {
+            _id: alumno._id,
+            fullName: `${alumno.firstName} ${alumno.lastName}`,
+            firstName: alumno.firstName,
+            lastName: alumno.lastName,
+            
+            // ✅ AGREGAR CAMPOS FALTANTES:
+            dateOfBirth: alumno.dateOfBirth,
+            age: alumno.age || (() => {
+                // Calcular edad si no está disponible
+                if (!alumno.dateOfBirth) return null;
+                const today = new Date();
+                const birthDate = new Date(alumno.dateOfBirth);
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+                }
+                return age;
+            })(),
+            gender: alumno.gender,
+            
+            email: alumno.email,
+            phone: alumno.phone,
+            
+            // ✅ AGREGAR CAMPOS ADICIONALES:
+            address: alumno.address,
+            relationshipToTutor: alumno.relationshipToTutor,
+            emergencyContact: alumno.emergencyContact,
+            medicalInfo: alumno.medicalInfo,
+            preferences: alumno.preferences,
+            notes: alumno.notes,
+            
+            belt: alumno.belt,
+            enrollment: alumno.enrollment,
+            stats: alumno.stats,
+            
+            // ✅ AGREGAR CAMPOS DE FOTO:
+            profilePhoto: alumno.profilePhoto,
+            profilePhotoUrl: (() => {
+                if (alumno.profilePhoto && alumno.profilePhoto.url) {
+                if (alumno.profilePhoto.url.startsWith('http')) {
+                    return alumno.profilePhoto.url;
+                }
+                const baseUrl = process.env.BASE_URL || 'http://localhost:3005';
+                return `${baseUrl}${alumno.profilePhoto.url}`;
+                }
+                return null;
+            })(),
+            
+            isActive: alumno.isActive,
+            createdAt: alumno.createdAt,
+            updatedAt: alumno.updatedAt,
+            
+            // Referencias pobladas
+            sucursalInfo: alumno.sucursalInfo?.[0],
+            tutorInfo: alumno.tutorInfo?.[0]
+            };
+        }
     });
 
     res.json({

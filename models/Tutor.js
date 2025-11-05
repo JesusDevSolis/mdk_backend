@@ -36,7 +36,7 @@ const tutorSchema = new mongoose.Schema({
   identification: {
     type: {
       type: String,
-      enum: ['cedula', 'pasaporte', 'licencia', 'otro'],
+      enum: ['ine', 'pasaporte', 'licencia', 'otro'],
       required: [true, 'El tipo de identificación es requerido']
     },
     number: {

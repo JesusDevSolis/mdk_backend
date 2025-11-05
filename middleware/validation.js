@@ -256,7 +256,7 @@ const validateTutor = [
   body('identification.type')
     .notEmpty()
     .withMessage('El tipo de identificación es requerido')
-    .isIn(['cedula', 'pasaporte', 'licencia', 'otro'])
+    .isIn(['ine', 'cedula', 'pasaporte', 'licencia', 'otro'])
     .withMessage('Tipo de identificación inválido'),
 
   body('identification.number')
@@ -355,7 +355,7 @@ const validateTutorUpdate = [
 
   body('identification.type')
     .optional()
-    .isIn(['cedula', 'pasaporte', 'licencia', 'otro'])
+    .isIn(['ine', 'cedula', 'pasaporte', 'licencia', 'otro'])
     .withMessage('Tipo de identificación inválido'),
 
   body('identification.number')
