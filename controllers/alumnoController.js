@@ -174,7 +174,7 @@ const getAlumnos = async (req, res) => {
             firstName: alumno.firstName,
             lastName: alumno.lastName,
             
-            // ✅ AGREGAR CAMPOS FALTANTES:
+            // AGREGAR CAMPOS FALTANTES:
             dateOfBirth: alumno.dateOfBirth,
             age: alumno.age || (() => {
                 // Calcular edad si no está disponible
@@ -193,7 +193,7 @@ const getAlumnos = async (req, res) => {
             email: alumno.email,
             phone: alumno.phone,
             
-            // ✅ AGREGAR CAMPOS ADICIONALES:
+            // AGREGAR CAMPOS ADICIONALES:
             address: alumno.address,
             relationshipToTutor: alumno.relationshipToTutor,
             emergencyContact: alumno.emergencyContact,
@@ -205,7 +205,7 @@ const getAlumnos = async (req, res) => {
             enrollment: alumno.enrollment,
             stats: alumno.stats,
             
-            // ✅ AGREGAR CAMPOS DE FOTO:
+            // AGREGAR CAMPOS DE FOTO:
             profilePhoto: alumno.profilePhoto,
             profilePhotoUrl: (() => {
                 if (alumno.profilePhoto && alumno.profilePhoto.url) {
