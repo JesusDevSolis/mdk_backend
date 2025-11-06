@@ -135,7 +135,7 @@ app.get('/', (req, res) => {
         message: 'API del Sistema de Taekwondo funcionando correctamente',
         version: '2.0.0',
         status: 'active',
-        modules: ['auth', 'sucursales', 'tutores', 'alumnos']
+        modules: ['auth', 'sucursales', 'tutores', 'alumnos', 'pagos']
     });
 });
 
@@ -149,7 +149,8 @@ app.get('/api/health', (req, res) => {
             auth: 'active',
             sucursales: 'active',
             tutores: 'active',
-            alumnos: 'active'
+            alumnos: 'active',
+            pagos: 'active'
         }
     });
 });
@@ -157,8 +158,9 @@ app.get('/api/health', (req, res) => {
 // Rutas de la API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/sucursales', require('./routes/sucursales'));
-app.use('/api/tutores', require('./routes/tutores'));      // NUEVA RUTA
-app.use('/api/alumnos', require('./routes/alumnos'));      // NUEVA RUTA
+app.use('/api/tutores', require('./routes/tutores'));
+app.use('/api/alumnos', require('./routes/alumnos'));
+app.use('/api/pagos', require('./routes/payments'));
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
@@ -185,7 +187,7 @@ app.listen(PORT, () => {
     console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
     console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
     console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
-    console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos`);
+    console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos, Pagos`);
 });
 
 module.exports = app;
