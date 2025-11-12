@@ -9,15 +9,15 @@ const createAdminUser = async () => {
   try {
     // Conectar a MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Conectado a MongoDB');
+    // console.log('✅ Conectado a MongoDB');
 
     // Verificar si ya existe un admin
     const existingAdmin = await User.findOne({ role: 'admin' });
     
     if (existingAdmin) {
-      console.log('⚠️  Ya existe un usuario administrador:');
-      console.log(`📧 Email: ${existingAdmin.email}`);
-      console.log(`👤 Nombre: ${existingAdmin.name}`);
+      // console.log('⚠️  Ya existe un usuario administrador:');
+      // console.log(`📧 Email: ${existingAdmin.email}`);
+      // console.log(`👤 Nombre: ${existingAdmin.name}`);
       return;
     }
 
@@ -36,11 +36,11 @@ const createAdminUser = async () => {
     const admin = new User(adminData);
     await admin.save();
 
-    console.log('🎉 Usuario administrador creado exitosamente!');
-    console.log('📧 Email:', adminData.email);
-    console.log('🔑 Contraseña:', adminData.password);
-    console.log('👤 Nombre:', adminData.name);
-    console.log('🛡️  Rol:', adminData.role);
+    // console.log('🎉 Usuario administrador creado exitosamente!');
+    // console.log('📧 Email:', adminData.email);
+    // console.log('🔑 Contraseña:', adminData.password);
+    // console.log('👤 Nombre:', adminData.name);
+    // console.log('🛡️  Rol:', adminData.role);
     
   } catch (error) {
     console.error('❌ Error creando usuario administrador:', error.message);

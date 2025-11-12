@@ -134,8 +134,8 @@ app.get('/api/documents/:filename', (req, res) => {
     const { filename } = req.params;
     const documentPath = path.join(__dirname, 'uploads', 'documents', filename);
     
-    console.log('📄 Solicitando documento:', filename);
-    console.log('📁 Ruta completa:', documentPath);
+    // console.log('📄 Solicitando documento:', filename);
+    // console.log('📁 Ruta completa:', documentPath);
     
     // Headers súper permisivos
     res.header('Access-Control-Allow-Origin', '*');
@@ -156,7 +156,7 @@ app.get('/api/documents/:filename', (req, res) => {
         });
     }
     
-    console.log('✅ Documento encontrado, enviando...');
+    // console.log('✅ Documento encontrado, enviando...');
     
     // Configurar el tipo de contenido según la extensión
     const ext = path.extname(filename).toLowerCase();
@@ -250,7 +250,7 @@ app.use('/api/pagos', require('./routes/payments'));
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    // console.error(err.stack);
     res.status(500).json({ 
         message: 'Algo salió mal!',
         error: process.env.NODE_ENV === 'development' ? err.message : 'Error interno del servidor'
@@ -270,11 +270,11 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📡 API disponible en: http://localhost:${PORT}`);
-    console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
-    console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
-    console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
-    console.log(`📄 API Documentos: http://localhost:${PORT}/api/documents/`);
-    console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos, Pagos`);
+    // console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
+    // console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
+    // console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
+    // console.log(`📄 API Documentos: http://localhost:${PORT}/api/documents/`);
+    // console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos, Pagos`);
 });
 
 module.exports = app;

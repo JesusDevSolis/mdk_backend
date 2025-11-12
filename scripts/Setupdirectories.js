@@ -12,7 +12,7 @@ const setupDirectories = async () => {
       'uploads/temp'
     ];
 
-    console.log('🔧 Configurando directorios necesarios...');
+    // console.log('🔧 Configurando directorios necesarios...');
 
     for (const dir of directories) {
       const fullPath = path.join(__dirname, '..', dir);
@@ -38,7 +38,7 @@ const setupDirectories = async () => {
       }
     }
 
-    console.log('🎉 Configuración de directorios completada!');
+    // console.log('🎉 Configuración de directorios completada!');
     
   } catch (error) {
     console.error('❌ Error configurando directorios:', error.message);

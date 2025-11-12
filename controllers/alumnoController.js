@@ -184,7 +184,7 @@ const getAlumnos = async (req, res) => {
                 let age = today.getFullYear() - birthDate.getFullYear();
                 const monthDiff = today.getMonth() - birthDate.getMonth();
                 if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                age--;
+                  age--;
                 }
                 return age;
             })(),
@@ -419,7 +419,7 @@ const createAlumno = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creando alumno:', error);
+    // console.error('Error creando alumno:', error);
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -569,10 +569,10 @@ const updateAlumno = async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     ).populate('enrollment.sucursal', 'name')
-     .populate('tutor', 'firstName lastName email')
-     .populate('belt.certifiedBy', 'name')
-     .populate('createdBy', 'name email')
-     .populate('lastModifiedBy', 'name email');
+    .populate('tutor', 'firstName lastName email')
+    .populate('belt.certifiedBy', 'name')
+    .populate('createdBy', 'name email')
+    .populate('lastModifiedBy', 'name email');
 
     // Actualizar estadísticas de sucursales si cambió
     if (newSucursalId && newSucursalId !== oldSucursalId.toString()) {
@@ -591,7 +591,7 @@ const updateAlumno = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error actualizando alumno:', error);
+    // console.error('Error actualizando alumno:', error);
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -656,7 +656,7 @@ const deleteAlumno = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error eliminando alumno:', error);
+    // console.error('Error eliminando alumno:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

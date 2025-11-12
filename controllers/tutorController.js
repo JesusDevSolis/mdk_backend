@@ -387,7 +387,7 @@ const updateTutor = async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     ).populate('createdBy', 'name email')
-     .populate('lastModifiedBy', 'name email');
+    .populate('lastModifiedBy', 'name email');
 
     res.json({
       success: true,

@@ -223,9 +223,9 @@ const createSucursal = async (req, res) => {
 // @access  Private (Admin or Manager)
 const updateSucursal = async (req, res) => {
   try {
-    console.log('📥 UPDATE - Datos recibidos:', req.body);
-    console.log('🆔 UPDATE - ID:', req.params.id);
-    console.log('👤 UPDATE - Usuario:', req.user.email);
+    // console.log('📥 UPDATE - Datos recibidos:', req.body);
+    // console.log('🆔 UPDATE - ID:', req.params.id);
+    // console.log('👤 UPDATE - Usuario:', req.user.email);
     
     const { id } = req.params;
     const {
@@ -313,14 +313,14 @@ const updateSucursal = async (req, res) => {
       if (isActive !== undefined) updateData.isActive = isActive;
     }
 
-    console.log('✅ Datos limpios para actualizar:', updateData);
+    // console.log('✅ Datos limpios para actualizar:', updateData);
 
     const updatedSucursal = await Sucursal.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
     ).populate('manager', 'name email role')
-     .populate('createdBy', 'name email');
+    .populate('createdBy', 'name email');
 
     res.json({
       success: true,
@@ -331,9 +331,9 @@ const updateSucursal = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ ERROR COMPLETO:', error);
-    console.error('❌ ERROR MESSAGE:', error.message);
-    console.error('❌ ERROR NAME:', error.name);
+    // console.error('❌ ERROR COMPLETO:', error);
+    // console.error('❌ ERROR MESSAGE:', error.message);
+    // console.error('❌ ERROR NAME:', error.name);
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -429,8 +429,7 @@ const uploadLogo = async (req, res) => {
     }
 
     // Verificar permisos
-    const canEdit = req.user.role === 'admin' || 
-                   sucursal.manager?.toString() === req.user._id.toString();
+    const canEdit = req.user.role === 'admin' || sucursal.manager?.toString() === req.user._id.toString();
     
     if (!canEdit) {
       return res.status(403).json({
@@ -451,7 +450,7 @@ const uploadLogo = async (req, res) => {
       try {
         const oldLogoPath = path.join(__dirname, '../uploads/logos', sucursal.logo.filename);
         await fs.unlink(oldLogoPath);
-        console.log('✅ Logo anterior eliminado');
+        // console.log('✅ Logo anterior eliminado');
       } catch (error) {
         console.error('⚠️ Error eliminando logo anterior:', error);
       }
@@ -468,8 +467,8 @@ const uploadLogo = async (req, res) => {
 
     await sucursal.save();
 
-    console.log('✅ Logo guardado exitosamente');
-    console.log('  - logoUrl:', sucursal.logoUrl);
+    // console.log('✅ Logo guardado exitosamente');
+    // console.log('  - logoUrl:', sucursal.logoUrl);
 
     res.json({
       success: true,
@@ -507,8 +506,7 @@ const getSucursalStats = async (req, res) => {
     }
 
     // Verificar permisos
-    const canView = req.user.role === 'admin' || 
-                   sucursal.manager?.toString() === req.user._id.toString();
+    const canView = req.user.role === 'admin' || sucursal.manager?.toString() === req.user._id.toString();
     
     if (!canView) {
       return res.status(403).json({

@@ -9,11 +9,11 @@ const createInstructors = async () => {
   try {
     // Conectar a MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Conectado a MongoDB');
+    // console.log('✅ Conectado a MongoDB');
 
     // Verificar cuántos instructores ya existen
     const existingInstructors = await User.find({ role: 'instructor' });
-    console.log(`📊 Instructores existentes: ${existingInstructors.length}`);
+    // console.log(`📊 Instructores existentes: ${existingInstructors.length}`);
 
     if (existingInstructors.length >= 3) {
       console.log('⚠️  Ya hay suficientes instructores. No es necesario crear más.');
@@ -51,7 +51,7 @@ const createInstructors = async () => {
       }
     ];
 
-    console.log('🔧 Creando instructores de prueba...');
+    // console.log('🔧 Creando instructores de prueba...');
 
     for (const instructorData of instructorsData) {
       // Verificar si el email ya existe
@@ -69,9 +69,9 @@ const createInstructors = async () => {
       console.log(`✅ Instructor creado: ${instructorData.name} (${instructorData.email})`);
     }
 
-    console.log('🎉 Instructores de prueba creados exitosamente!');
-    console.log('');
-    console.log('📧 Credenciales de acceso:');
+    // console.log('🎉 Instructores de prueba creados exitosamente!');
+    // console.log('');
+    // console.log('📧 Credenciales de acceso:');
     instructorsData.forEach(instructor => {
       console.log(`   ${instructor.name}: ${instructor.email} / instructor123`);
     });

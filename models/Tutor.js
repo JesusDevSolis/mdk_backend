@@ -409,7 +409,7 @@ tutorSchema.pre('save', function(next) {
 // Middleware para limpiar referencias al eliminar
 tutorSchema.pre('remove', async function(next) {
   try {
-    console.log(`Eliminando tutor: ${this.fullName}`);
+    // console.log(`Eliminando tutor: ${this.fullName}`);
     
     // Verificar si tiene hijos activos
     const Alumno = mongoose.model('Alumno');
