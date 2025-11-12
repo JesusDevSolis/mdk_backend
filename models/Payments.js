@@ -309,6 +309,23 @@ paymentSchema.methods.markAsPaid = async function(paymentData, userId) {
   this.paidBy = userId;
   this.lastModifiedBy = userId;
   
+  // Generar número de recibo si no existe
+  if (!this.receiptNumber) {
+    const year = new Date().getFullYear();
+    const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+    
+    try {
+      const count = await this.constructor.countDocuments({
+        receiptNumber: new RegExp(`^REC-${year}${month}`)
+      });
+      
+      const sequence = (count + 1).toString().padStart(5, '0');
+      this.receiptNumber = `REC-${year}${month}-${sequence}`;
+    } catch (error) {
+      console.error('Error generando número de recibo:', error);
+    }
+  }
+  
   await this.save();
   return this;
 };
@@ -323,30 +340,41 @@ paymentSchema.methods.cancel = async function(userId, reason) {
   return this;
 };
 
-// Método para obtener información pública
+// 🔧 MÉTODO CORREGIDO: getPublicInfo - Ahora incluye datos populados
 paymentSchema.methods.getPublicInfo = function() {
+  const obj = this.toObject();
+  
   return {
-    _id: this._id,
-    alumno: this.alumno,
-    tutor: this.tutor,
-    sucursal: this.sucursal,
-    type: this.type,
-    description: this.description,
-    amount: this.amount,
-    discount: this.discount,
-    total: this.total,
-    dueDate: this.dueDate,
-    paidDate: this.paidDate,
-    period: this.period,
-    periodName: this.periodName,
-    status: this.status,
-    paymentMethod: this.paymentMethod,
-    receiptNumber: this.receiptNumber,
-    isOverdue: this.isOverdue,
-    daysOverdue: this.daysOverdue,
-    receiptFileUrl: this.receiptFileUrl,
-    createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    _id: obj._id,
+    // Incluir alumno completo (populado o ID)
+    alumno: obj.alumno,
+    // Incluir tutor completo (populado o ID)  
+    tutor: obj.tutor,
+    // Incluir sucursal completa (populada o ID)
+    sucursal: obj.sucursal,
+    type: obj.type,
+    description: obj.description,
+    amount: obj.amount,
+    discount: obj.discount,
+    total: obj.total,
+    dueDate: obj.dueDate,
+    paidDate: obj.paidDate,
+    period: obj.period,
+    periodName: obj.periodName,
+    status: obj.status,
+    paymentMethod: obj.paymentMethod,
+    paymentReference: obj.paymentReference,
+    receiptNumber: obj.receiptNumber,
+    isOverdue: obj.isOverdue,
+    daysOverdue: obj.daysOverdue,
+    receiptFile: obj.receiptFile,
+    receiptFileUrl: obj.receiptFileUrl,
+    notes: obj.notes, // ✅ AGREGADO: incluir notas
+    createdBy: obj.createdBy,
+    lastModifiedBy: obj.lastModifiedBy,
+    paidBy: obj.paidBy,
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt
   };
 };
 
@@ -477,8 +505,18 @@ paymentSchema.pre('save', async function(next) {
 
 // Actualizar estado a vencido automáticamente
 paymentSchema.pre('save', function(next) {
-  if (this.status === 'pendiente' && new Date() > new Date(this.dueDate)) {
-    this.status = 'vencido';
+  if (this.status === 'pendiente') {
+    const hoy = new Date();
+    const fechaVencimiento = new Date(this.dueDate);
+    
+    // Normalizar ambas fechas a medianoche para comparación justa
+    hoy.setHours(0, 0, 0, 0);
+    fechaVencimiento.setHours(0, 0, 0, 0);
+    
+    // Solo marcar como vencido si la fecha de vencimiento es MENOR que hoy
+    if (fechaVencimiento < hoy) {
+      this.status = 'vencido';
+    }
   }
   next();
 });

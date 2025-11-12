@@ -129,6 +129,92 @@ app.get('/api/images/profiles/:filename', (req, res) => {
     res.sendFile(imagePath);
 });
 
+// 🔧 NUEVO: Endpoint para comprobantes de pago (documentos)
+app.get('/api/documents/:filename', (req, res) => {
+    const { filename } = req.params;
+    const documentPath = path.join(__dirname, 'uploads', 'documents', filename);
+    
+    console.log('📄 Solicitando documento:', filename);
+    console.log('📁 Ruta completa:', documentPath);
+    
+    // Headers súper permisivos
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.header('Cache-Control', 'no-cache');
+    
+    // Verificar si el archivo existe
+    const fs = require('fs');
+    if (!fs.existsSync(documentPath)) {
+        console.log('❌ Documento no encontrado:', documentPath);
+        return res.status(404).json({
+            success: false,
+            message: 'Documento no encontrado',
+            path: documentPath
+        });
+    }
+    
+    console.log('✅ Documento encontrado, enviando...');
+    
+    // Configurar el tipo de contenido según la extensión
+    const ext = path.extname(filename).toLowerCase();
+    const contentTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    
+    if (contentTypes[ext]) {
+        res.header('Content-Type', contentTypes[ext]);
+    }
+    
+    // Servir el documento
+    res.sendFile(documentPath);
+});
+
+// Endpoint de prueba para listar documentos (útil para debugging)
+app.get('/api/documents', (req, res) => {
+    const fs = require('fs');
+    const documentsPath = path.join(__dirname, 'uploads', 'documents');
+    
+    try {
+        if (!fs.existsSync(documentsPath)) {
+            return res.json({
+                success: true,
+                message: 'Carpeta de documentos no existe aún',
+                documents: []
+            });
+        }
+        
+        const files = fs.readdirSync(documentsPath);
+        const documents = files.map(file => ({
+            filename: file,
+            url: `/uploads/documents/${file}`,
+            apiUrl: `/api/documents/${file}`,
+            fullUrl: `http://localhost:${PORT}/uploads/documents/${file}`,
+            fullApiUrl: `http://localhost:${PORT}/api/documents/${file}`
+        }));
+        
+        res.json({
+            success: true,
+            total: documents.length,
+            documentsPath,
+            documents
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al listar documentos',
+            error: error.message
+        });
+    }
+});
+
 // Ruta de prueba
 app.get('/', (req, res) => {
     res.json({ 
@@ -178,7 +264,7 @@ app.use('*', (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3005;
 
 app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
@@ -187,6 +273,7 @@ app.listen(PORT, () => {
     console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
     console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
     console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
+    console.log(`📄 API Documentos: http://localhost:${PORT}/api/documents/`);
     console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos, Pagos`);
 });
 

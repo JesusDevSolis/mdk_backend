@@ -43,7 +43,7 @@ jspm_packages/
 .env
 
 # Uploads folder (archivos subidos por usuarios)
-uploads/
+#uploads/
 
 # OS
 .DS_Store
