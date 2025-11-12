@@ -173,7 +173,7 @@ const sucursalSchema = new mongoose.Schema({
 });
 
 // Indices para mejorar performance
-sucursalSchema.index({ name: 1 });
+// ✅ CORREGIDO: name ya tiene unique: true, no necesita índice explícito
 sucursalSchema.index({ isActive: 1 });
 sucursalSchema.index({ createdBy: 1 });
 sucursalSchema.index({ manager: 1 });
@@ -181,17 +181,12 @@ sucursalSchema.index({ 'settings.monthlyFee': 1 });
 
 // Virtual para obtener la URL completa del logo
 sucursalSchema.virtual('logoUrl').get(function() {
-  // console.log('🔍 DEBUG logoUrl virtual:');
-  // console.log('  - this.logo:', this.logo);
-  
   if (this.logo && this.logo.filename) {
     // Usar endpoint de API en lugar de archivos estáticos
     const baseUrl = process.env.BASE_URL || 'http://localhost:3005';
     const apiUrl = `${baseUrl}/api/images/logos/${this.logo.filename}`;
-    // console.log('  - Devolviendo URL de API:', apiUrl);
     return apiUrl;
   }
-  // console.log('  - No hay logo, devolviendo null');
   return null;
 });
 
@@ -219,16 +214,12 @@ sucursalSchema.virtual('isOpenNow').get(function() {
     const currentMinute = mexicoTime.getMinutes().toString().padStart(2, '0');
     const currentTime = `${currentHour}:${currentMinute}`;
     
-    // console.log(`Debug isOpenNow Mexico: dia=${currentDay}, hora=${currentTime}`);
-    
     const daySchedule = this.schedule[currentDay];
     if (!daySchedule || !daySchedule.isOpen) {
-      // console.log(`Sucursal cerrada - dia no operativo: ${currentDay}`);
       return false;
     }
     
     const isOpen = currentTime >= daySchedule.openTime && currentTime <= daySchedule.closeTime;
-    // console.log(`Horario: ${daySchedule.openTime}-${daySchedule.closeTime}, actual: ${currentTime}, abierto: ${isOpen}`);
     
     return isOpen;
   } catch (error) {
@@ -315,7 +306,7 @@ sucursalSchema.pre('save', function(next) {
 // Middleware para limpiar referencias al eliminar
 sucursalSchema.pre('remove', async function(next) {
   try {
-    // console.log(`Eliminando sucursal: ${this.name}`);
+    console.log(`Eliminando sucursal: ${this.name}`);
     next();
   } catch (error) {
     next(error);

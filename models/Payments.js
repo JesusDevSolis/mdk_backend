@@ -44,7 +44,6 @@ const paymentSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'La descripción no puede exceder 200 caracteres'],
     default: function() {
-      // Descripción automática basada en el tipo
       const descriptions = {
         'colegiatura': 'Pago de colegiatura mensual',
         'inscripcion': 'Pago de inscripción',
@@ -64,7 +63,6 @@ const paymentSchema = new mongoose.Schema({
     min: [0, 'El monto no puede ser negativo'],
     validate: {
       validator: function(value) {
-        // Validar que sea un número con máximo 2 decimales
         return /^\d+(\.\d{1,2})?$/.test(value.toString());
       },
       message: 'El monto debe tener máximo 2 decimales'
@@ -99,7 +97,6 @@ const paymentSchema = new mongoose.Schema({
     validate: {
       validator: function(date) {
         if (!date) return true;
-        // La fecha de pago no puede ser futura
         return date <= new Date();
       },
       message: 'La fecha de pago no puede ser futura'
@@ -114,7 +111,6 @@ const paymentSchema = new mongoose.Schema({
       max: 12,
       validate: {
         validator: function(value) {
-          // Solo requerido para colegiaturas
           if (this.type === 'colegiatura') {
             return value !== null && value !== undefined;
           }
@@ -129,7 +125,6 @@ const paymentSchema = new mongoose.Schema({
       max: 2100,
       validate: {
         validator: function(value) {
-          // Solo requerido para colegiaturas
           if (this.type === 'colegiatura') {
             return value !== null && value !== undefined;
           }
@@ -167,7 +162,7 @@ const paymentSchema = new mongoose.Schema({
   receiptNumber: {
     type: String,
     unique: true,
-    sparse: true, // Permite nulls pero mantiene unicidad
+    sparse: true,
     trim: true,
     uppercase: true
   },
@@ -244,12 +239,12 @@ const paymentSchema = new mongoose.Schema({
 });
 
 // ===== ÍNDICES COMPUESTOS =====
+// ✅ CORREGIDO: receiptNumber ya tiene unique: true con sparse, no necesita índice explícito
 paymentSchema.index({ alumno: 1, dueDate: -1 });
 paymentSchema.index({ sucursal: 1, status: 1 });
 paymentSchema.index({ type: 1, status: 1 });
 paymentSchema.index({ status: 1, dueDate: 1 });
 paymentSchema.index({ 'period.year': 1, 'period.month': 1 });
-paymentSchema.index({ receiptNumber: 1 }, { unique: true, sparse: true });
 paymentSchema.index({ createdAt: -1 });
 
 // ===== VIRTUALS =====
@@ -340,17 +335,14 @@ paymentSchema.methods.cancel = async function(userId, reason) {
   return this;
 };
 
-// 🔧 MÉTODO CORREGIDO: getPublicInfo - Ahora incluye datos populados
+// Método getPublicInfo
 paymentSchema.methods.getPublicInfo = function() {
   const obj = this.toObject();
   
   return {
     _id: obj._id,
-    // Incluir alumno completo (populado o ID)
     alumno: obj.alumno,
-    // Incluir tutor completo (populado o ID)  
     tutor: obj.tutor,
-    // Incluir sucursal completa (populada o ID)
     sucursal: obj.sucursal,
     type: obj.type,
     description: obj.description,
@@ -369,7 +361,7 @@ paymentSchema.methods.getPublicInfo = function() {
     daysOverdue: obj.daysOverdue,
     receiptFile: obj.receiptFile,
     receiptFileUrl: obj.receiptFileUrl,
-    notes: obj.notes, // ✅ AGREGADO: incluir notas
+    notes: obj.notes,
     createdBy: obj.createdBy,
     lastModifiedBy: obj.lastModifiedBy,
     paidBy: obj.paidBy,
@@ -380,7 +372,6 @@ paymentSchema.methods.getPublicInfo = function() {
 
 // ===== MÉTODOS ESTÁTICOS =====
 
-// Buscar pagos activos
 paymentSchema.statics.findActive = function(filters = {}) {
   return this.find({ 
     isActive: true,
@@ -393,7 +384,6 @@ paymentSchema.statics.findActive = function(filters = {}) {
     .sort({ createdAt: -1 });
 };
 
-// Buscar pagos pendientes
 paymentSchema.statics.findPending = function(filters = {}) {
   return this.find({ 
     status: 'pendiente',
@@ -406,7 +396,6 @@ paymentSchema.statics.findPending = function(filters = {}) {
     .sort({ dueDate: 1 });
 };
 
-// Buscar pagos vencidos
 paymentSchema.statics.findOverdue = function(filters = {}) {
   return this.find({ 
     status: 'pendiente',
@@ -420,7 +409,6 @@ paymentSchema.statics.findOverdue = function(filters = {}) {
     .sort({ dueDate: 1 });
 };
 
-// Buscar por alumno
 paymentSchema.statics.findByAlumno = function(alumnoId, filters = {}) {
   return this.find({ 
     alumno: alumnoId,
@@ -432,7 +420,6 @@ paymentSchema.statics.findByAlumno = function(alumnoId, filters = {}) {
     .sort({ dueDate: -1 });
 };
 
-// Buscar por tutor
 paymentSchema.statics.findByTutor = function(tutorId, filters = {}) {
   return this.find({ 
     tutor: tutorId,
@@ -444,7 +431,6 @@ paymentSchema.statics.findByTutor = function(tutorId, filters = {}) {
     .sort({ dueDate: -1 });
 };
 
-// Obtener estadísticas de pagos
 paymentSchema.statics.getStats = async function(filters = {}) {
   const stats = await this.aggregate([
     { 
@@ -477,19 +463,14 @@ paymentSchema.statics.getStats = async function(filters = {}) {
 
 // ===== MIDDLEWARE PRE-SAVE =====
 
-// Generar número de recibo automáticamente
 paymentSchema.pre('save', async function(next) {
-  // Solo generar si es un pago nuevo y está pagado
   if (this.isNew && this.status === 'pagado' && !this.receiptNumber) {
     try {
       const year = new Date().getFullYear();
       const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-      
-      // Contar pagos del mes actual
       const count = await this.constructor.countDocuments({
         receiptNumber: new RegExp(`^REC-${year}${month}`)
       });
-      
       const sequence = (count + 1).toString().padStart(5, '0');
       this.receiptNumber = `REC-${year}${month}-${sequence}`;
     } catch (error) {
@@ -497,23 +478,16 @@ paymentSchema.pre('save', async function(next) {
     }
   }
   
-  // Actualizar el total
   this.total = this.amount - (this.discount || 0);
-  
   next();
 });
 
-// Actualizar estado a vencido automáticamente
 paymentSchema.pre('save', function(next) {
   if (this.status === 'pendiente') {
     const hoy = new Date();
     const fechaVencimiento = new Date(this.dueDate);
-    
-    // Normalizar ambas fechas a medianoche para comparación justa
     hoy.setHours(0, 0, 0, 0);
     fechaVencimiento.setHours(0, 0, 0, 0);
-    
-    // Solo marcar como vencido si la fecha de vencimiento es MENOR que hoy
     if (fechaVencimiento < hoy) {
       this.status = 'vencido';
     }
@@ -523,10 +497,8 @@ paymentSchema.pre('save', function(next) {
 
 // ===== MIDDLEWARE POST-SAVE =====
 
-// Actualizar estadísticas del alumno después de guardar
 paymentSchema.post('save', async function(doc) {
   try {
-    // Aquí podrías actualizar estadísticas del alumno si lo necesitas
     console.log(`Pago guardado: ${doc.receiptNumber || doc._id}`);
   } catch (error) {
     console.error('Error en post-save de Payment:', error);

@@ -101,7 +101,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Índices para mejorar performance
-userSchema.index({ email: 1 });
+// ✅ CORREGIDO: email ya tiene unique: true, no necesita índice explícito
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ sucursal: 1 });

@@ -284,9 +284,8 @@ const tutorSchema = new mongoose.Schema({
 });
 
 // Índices para mejorar performance
+// ✅ CORREGIDO: email ya tiene unique: true, no necesita índice explícito
 tutorSchema.index({ firstName: 1, lastName: 1 });
-tutorSchema.index({ email: 1 }, { unique: true });
-tutorSchema.index({ 'identification.number': 1 }, { unique: true });
 tutorSchema.index({ 'phones.primary': 1 });
 tutorSchema.index({ isActive: 1 });
 tutorSchema.index({ createdAt: -1 });
@@ -409,7 +408,7 @@ tutorSchema.pre('save', function(next) {
 // Middleware para limpiar referencias al eliminar
 tutorSchema.pre('remove', async function(next) {
   try {
-    // console.log(`Eliminando tutor: ${this.fullName}`);
+    console.log(`Eliminando tutor: ${this.fullName}`);
     
     // Verificar si tiene hijos activos
     const Alumno = mongoose.model('Alumno');

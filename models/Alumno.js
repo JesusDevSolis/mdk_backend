@@ -358,14 +358,13 @@ const alumnoSchema = new mongoose.Schema({
 });
 
 // Índices para mejorar performance
+// ✅ CORREGIDO: email ya tiene unique: true con sparse
+// ✅ CORREGIDO: enrollment.studentId ya tiene unique: true
 alumnoSchema.index({ firstName: 1, lastName: 1 });
 alumnoSchema.index({ 'enrollment.sucursal': 1 });
 alumnoSchema.index({ 'enrollment.status': 1 });
-alumnoSchema.index({ 'enrollment.studentId': 1 });
-alumnoSchema.index({ email: 1 });
-alumnoSchema.index({ phone: 1 });
 alumnoSchema.index({ 'belt.level': 1 });
-alumnoSchema.index({ tutor: 1 }); // NUEVO ÍNDICE
+alumnoSchema.index({ tutor: 1 });
 alumnoSchema.index({ createdAt: -1 });
 alumnoSchema.index({ isActive: 1 });
 
@@ -435,12 +434,10 @@ alumnoSchema.methods.getPublicInfo = function() {
     lastName: this.lastName,
     age: this.age,
     isMinor: this.isMinor,
-
     dateOfBirth: this.dateOfBirth,
     gender: this.gender,
     email: this.email,
     phone: this.phone,
-
     address: this.address,
     tutor: this.tutor,
     relationshipToTutor: this.relationshipToTutor,
@@ -448,16 +445,14 @@ alumnoSchema.methods.getPublicInfo = function() {
     medicalInfo: this.medicalInfo,
     preferences: this.preferences,
     notes: this.notes,
-
     profilePhotoUrl: this.profilePhotoUrl,
     belt: this.belt,
     enrollment: this.enrollment,
     stats: this.stats,
     membershipDuration: this.membershipDuration,
-    relationshipToTutor: this.relationshipToTutor,
     isActive: this.isActive,
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt,
+    updatedAt: this.updatedAt
   };
 };
 
@@ -484,7 +479,7 @@ alumnoSchema.statics.findActive = function(filters = {}) {
     ...filters 
   }).populate('enrollment.sucursal', 'name')
     .populate('belt.certifiedBy', 'name')
-    .populate('tutor', 'firstName lastName email phones.primary') // POPULATE TUTOR
+    .populate('tutor', 'firstName lastName email phones.primary')
     .populate('createdBy', 'name');
 };
 
