@@ -129,6 +129,32 @@ app.get('/api/images/profiles/:filename', (req, res) => {
     res.sendFile(imagePath);
 });
 
+// Endpoint para imágenes de instructores
+app.get('/api/images/instructors/:filename', (req, res) => {
+    const { filename } = req.params;
+    const imagePath = path.join(__dirname, 'uploads', 'instructors', filename);
+    
+    // Headers súper permisivos
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.header('Cache-Control', 'no-cache');
+    
+    // Verificar si el archivo existe
+    const fs = require('fs');
+    if (!fs.existsSync(imagePath)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Imagen no encontrada'
+        });
+    }
+    
+    // Servir la imagen
+    res.sendFile(imagePath);
+});
+
 // 🔧 NUEVO: Endpoint para comprobantes de pago (documentos)
 app.get('/api/documents/:filename', (req, res) => {
     const { filename } = req.params;
@@ -221,7 +247,7 @@ app.get('/', (req, res) => {
         message: 'API del Sistema de Taekwondo funcionando correctamente',
         version: '2.0.0',
         status: 'active',
-        modules: ['auth', 'sucursales', 'tutores', 'alumnos', 'pagos']
+        modules: ['auth', 'sucursales', 'tutores', 'alumnos', 'pagos', 'instructores']
     });
 });
 
@@ -236,7 +262,8 @@ app.get('/api/health', (req, res) => {
             sucursales: 'active',
             tutores: 'active',
             alumnos: 'active',
-            pagos: 'active'
+            pagos: 'active',
+            instructores: 'active'
         }
     });
 });
@@ -247,6 +274,7 @@ app.use('/api/sucursales', require('./routes/sucursales'));
 app.use('/api/tutores', require('./routes/tutores'));
 app.use('/api/alumnos', require('./routes/alumnos'));
 app.use('/api/pagos', require('./routes/payments'));
+app.use('/api/instructores', require('./routes/instructors'));
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
