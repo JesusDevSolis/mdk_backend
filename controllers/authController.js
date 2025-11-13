@@ -419,6 +419,165 @@ const getUsers = async (req, res) => {
   }
 };
 
+// @desc    Crear instructor completo
+// @route   POST /api/auth/instructor/complete
+// @access  Private (Admin only)
+const createCompleteInstructor = async (req, res) => {
+  try {
+    const {
+      name, email, password, phone, address, sucursal,
+      notifications, profileImage, instructorInfo
+    } = req.body;
+
+    // Validaciones básicas
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre, email y contraseña son requeridos'
+      });
+    }
+
+    if (!sucursal) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sucursal es requerida para instructores'
+      });
+    }
+
+    // Verificar si el usuario ya existe
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un usuario con este email'
+      });
+    }
+
+    // Crear usuario instructor completo
+    const userData = {
+      name,
+      email,
+      password,
+      role: 'instructor',
+      phone,
+      address,
+      sucursal,
+      notifications,
+      profileImage,
+      instructorInfo,
+      createdBy: req.user._id
+    };
+
+    const user = new User(userData);
+    await user.save();
+
+    // Generar token
+    const token = generateToken(user._id);
+
+    // Respuesta exitosa
+    res.status(201).json({
+      success: true,
+      message: 'Instructor creado exitosamente',
+      data: {
+        user: user.getPublicProfile(),
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al crear instructor completo:', error);
+
+    // Manejar errores específicos
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un usuario con este email'
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Error de validación',
+        errors: messages
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+// @desc    Actualizar instructor completo
+// @route   PUT /api/auth/instructor/complete/:id
+// @access  Private (Admin only)
+const updateCompleteInstructor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name, phone, address, sucursal,
+      notifications, profileImage, instructorInfo
+    } = req.body;
+
+    // Buscar instructor
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor no encontrado'
+      });
+    }
+
+    if (user.role !== 'instructor') {
+      return res.status(400).json({
+        success: false,
+        message: 'El usuario no es un instructor'
+      });
+    }
+
+    // Actualizar campos
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    if (address) user.address = address;
+    if (sucursal) user.sucursal = sucursal;
+    if (notifications) user.notifications = notifications;
+    if (profileImage !== undefined) user.profileImage = profileImage;
+    if (instructorInfo) user.instructorInfo = instructorInfo;
+
+    await user.save();
+
+    // Respuesta exitosa
+    res.json({
+      success: true,
+      message: 'Instructor actualizado exitosamente',
+      data: {
+        user: user.getPublicProfile()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al actualizar instructor completo:', error);
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Error de validación',
+        errors: messages
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -427,5 +586,7 @@ module.exports = {
   changePassword,
   getProfile,
   updateProfile,
-  getUsers
+  getUsers,
+  createCompleteInstructor,
+  updateCompleteInstructor
 };

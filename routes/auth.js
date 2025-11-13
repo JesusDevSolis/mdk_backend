@@ -10,7 +10,9 @@ const {
   changePassword,
   getProfile,
   updateProfile,
-  getUsers
+  getUsers,
+  createCompleteInstructor,
+  updateCompleteInstructor
 } = require('../controllers/authController');
 
 // Importar middleware de autenticación
@@ -69,5 +71,15 @@ router.put('/profile', authenticate, sanitizeInput, validateUpdateProfile, logAu
 // @desc    Obtener lista de usuarios (solo admin)
 // @access  Private (Admin only)
 router.get('/users', authenticate, isAdmin, validateUserQuery, logAuthRequest, getUsers);
+
+// @route   POST /api/auth/instructor/complete
+// @desc    Crear instructor con información completa
+// @access  Private (Admin only)
+router.post('/instructor/complete', authenticate, isAdmin, sanitizeInput, createCompleteInstructor);
+
+// @route   PUT /api/auth/instructor/complete/:id
+// @desc    Actualizar instructor con información completa
+// @access  Private (Admin only)
+router.put('/instructor/complete/:id', authenticate, isAdmin, sanitizeInput, updateCompleteInstructor);
 
 module.exports = router;

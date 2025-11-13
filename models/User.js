@@ -93,6 +93,142 @@ const userSchema = new mongoose.Schema({
   profileImage: {
     type: String, // URL de la imagen
     default: null
+  },
+  // Información adicional para instructores
+  instructorInfo: {
+    belt: {
+      type: String,
+      enum: {
+        values: [
+          'blanco', 'amarillo', 'verde', 'azul', 'rojo',
+          'negro_1dan', 'negro_2dan', 'negro_3dan', 'negro_4dan',
+          'negro_5dan', 'negro_6dan', 'negro_7dan', 'negro_8dan', 'negro_9dan'
+        ],
+        message: 'Cinturón inválido'
+      }
+    },
+    danGrade: {
+      type: Number,
+      min: [1, 'El grado DAN debe ser al menos 1'],
+      max: [9, 'El grado DAN no puede exceder 9']
+    },
+    certificationNumber: {
+      type: String,
+      trim: true
+    },
+    certificationDate: {
+      type: Date
+    },
+    certifyingOrganization: {
+      type: String,
+      trim: true
+    },
+    specialties: [{
+      type: String,
+      enum: {
+        values: [
+          'combate', 'poomsae', 'defensa_personal', 'armas',
+          'acrobacia', 'ninos', 'adultos', 'mayores',
+          'competicion', 'tradicional', 'olimpico'
+        ],
+        message: 'Especialidad inválida'
+      }
+    }],
+    yearsOfExperience: {
+      type: Number,
+      min: [0, 'Los años de experiencia no pueden ser negativos']
+    },
+    teachingExperience: {
+      type: String,
+      trim: true,
+      maxlength: [1000, 'La experiencia de enseñanza no puede exceder 1000 caracteres']
+    },
+    achievements: [{
+      title: {
+        type: String,
+        required: [true, 'El título del logro es requerido'],
+        trim: true
+      },
+      description: {
+        type: String,
+        trim: true
+      },
+      date: {
+        type: Date
+      }
+    }],
+    contractType: {
+      type: String,
+      enum: {
+        values: ['tiempo_completo', 'medio_tiempo', 'por_horas', 'honorarios'],
+        message: 'Tipo de contrato inválido'
+      }
+    },
+    availability: {
+      monday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      tuesday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      wednesday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      thursday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      friday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      saturday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      },
+      sunday: {
+        available: { type: Boolean, default: false },
+        hours: { type: String, trim: true }
+      }
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [2000, 'La biografía no puede exceder 2000 caracteres']
+    },
+    languages: [{
+      type: String,
+      trim: true
+    }],
+    hireDate: {
+      type: Date
+    },
+    salary: {
+      type: Number,
+      min: [0, 'El salario no puede ser negativo']
+    },
+    references: [{
+      name: {
+        type: String,
+        trim: true
+      },
+      phone: {
+        type: String,
+        trim: true
+      },
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true
+      },
+      relationship: {
+        type: String,
+        trim: true
+      }
+    }]
   }
 }, {
   timestamps: true, // Agrega createdAt y updatedAt automáticamente
