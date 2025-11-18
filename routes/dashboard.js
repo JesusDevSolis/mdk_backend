@@ -8,7 +8,8 @@ const {
     getSucursalesStats,
     getFinancieroStats,
     getAlumnosStats,
-    getResumen
+    getResumen,
+    getSucursalesComparativa
 } = require('../controllers/dashboardController');
 
 // Importar middleware de autenticación
@@ -57,6 +58,16 @@ router.get('/sucursales-stats',
     isInstructor, 
     logAuthRequest, 
     getSucursalesStats
+);
+
+// @route   GET /api/dashboard/sucursales-comparativa
+// @desc    Obtener comparativa de sucursales para tabla
+// @access  Private (Admin, Instructor)
+router.get('/sucursales-comparativa', 
+    authenticate, 
+    isInstructor, 
+    logAuthRequest, 
+    getSucursalesComparativa
 );
 
 // @route   GET /api/dashboard/financiero

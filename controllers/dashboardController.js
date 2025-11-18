@@ -649,6 +649,95 @@ const getResumen = async (req, res) => {
     }
 };
 
+// @desc    Obtener comparativa de sucursales para tabla
+// @route   GET /api/dashboard/sucursales-comparativa
+// @access  Private (Admin, Instructor)
+const getSucursalesComparativa = async (req, res) => {
+    try {
+        // Obtener todas las sucursales activas
+        const sucursales = await Sucursal.find({ isActive: true })
+            .select('name address')
+            .lean();
+
+        // Obtener fecha actual y del mes
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        // Para cada sucursal, calcular estadísticas
+        const sucursalesComparativa = await Promise.all(
+            sucursales.map(async (sucursal) => {
+                // Total de alumnos activos por sucursal
+                const totalAlumnos = await Alumno.countDocuments({
+                    'enrollment.sucursal': sucursal._id,
+                    'enrollment.status': 'activo',
+                    isActive: true
+                });
+
+                // Total de instructores asignados a la sucursal
+                const totalInstructores = await User.countDocuments({
+                    role: 'instructor',
+                    sucursal: sucursal._id,
+                    isActive: true
+                });
+
+                // Ingresos del mes actual por sucursal
+                const ingresosMes = await Payment.aggregate([
+                    {
+                        $match: {
+                            sucursal: sucursal._id,
+                            status: 'pagado',
+                            paidDate: {
+                                $gte: firstDayOfMonth,
+                                $lte: lastDayOfMonth
+                            },
+                            isActive: true
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            total: { $sum: '$total' }
+                        }
+                    }
+                ]);
+
+                const ingresosMesTotal = ingresosMes.length > 0 ? ingresosMes[0].total : 0;
+
+                return {
+                    _id: sucursal._id,
+                    nombre: sucursal.name,
+                    direccion: {
+                        ciudad: sucursal.address?.city || 'Sin ciudad',
+                        estado: sucursal.address?.state || 'Sin estado',
+                        calle: sucursal.address?.street || 'Sin dirección'
+                    },
+                    totalAlumnos,
+                    totalInstructores,
+                    ingresosMes: ingresosMesTotal
+                };
+            })
+        );
+
+        // Ordenar por ingresos descendente (mejor sucursal primero)
+        sucursalesComparativa.sort((a, b) => b.ingresosMes - a.ingresosMes);
+
+        res.status(200).json({
+            success: true,
+            data: sucursalesComparativa,
+            total: sucursalesComparativa.length
+        });
+
+    } catch (error) {
+        console.error('Error obteniendo comparativa de sucursales:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
+        });
+    }
+};
+
 // ===== FUNCIONES AUXILIARES =====
 
 // Función para calcular edad
@@ -671,5 +760,6 @@ module.exports = {
     getSucursalesStats,
     getFinancieroStats,
     getAlumnosStats,
-    getResumen
+    getResumen,
+    getSucursalesComparativa
 };
