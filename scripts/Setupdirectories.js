@@ -19,10 +19,10 @@ const setupDirectories = async () => {
       
       try {
         await fs.access(fullPath);
-        console.log(`✅ Directorio ya existe: ${dir}`);
+        console.log(`Directorio ya existe: ${dir}`);
       } catch {
         await fs.mkdir(fullPath, { recursive: true });
-        console.log(`📁 Directorio creado: ${dir}`);
+        console.log(`Directorio creado: ${dir}`);
       }
     }
 
@@ -34,14 +34,14 @@ const setupDirectories = async () => {
       try {
         await fs.writeFile(gitkeepPath, gitkeepContent);
       } catch (error) {
-        console.log(`⚠️  No se pudo crear .gitkeep en ${dir}`);
+        console.log(`No se pudo crear .gitkeep en ${dir}`);
       }
     }
 
-    // console.log('🎉 Configuración de directorios completada!');
+    // console.log('Configuración de directorios completada!');
     
   } catch (error) {
-    console.error('❌ Error configurando directorios:', error.message);
+    console.error('Error configurando directorios:', error.message);
   }
 };
 

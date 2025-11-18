@@ -160,9 +160,6 @@ app.get('/api/documents/:filename', (req, res) => {
     const { filename } = req.params;
     const documentPath = path.join(__dirname, 'uploads', 'documents', filename);
     
-    // console.log('📄 Solicitando documento:', filename);
-    // console.log('📁 Ruta completa:', documentPath);
-    
     // Headers súper permisivos
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET');
@@ -181,8 +178,6 @@ app.get('/api/documents/:filename', (req, res) => {
             path: documentPath
         });
     }
-    
-    // console.log('✅ Documento encontrado, enviando...');
     
     // Configurar el tipo de contenido según la extensión
     const ext = path.extname(filename).toLowerCase();
@@ -275,6 +270,7 @@ app.use('/api/tutores', require('./routes/tutores'));
 app.use('/api/alumnos', require('./routes/alumnos'));
 app.use('/api/pagos', require('./routes/payments'));
 app.use('/api/instructores', require('./routes/instructors'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
@@ -295,14 +291,9 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 3005;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-    console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📡 API disponible en: http://localhost:${PORT}`);
-    // console.log(`🖼️  Imágenes: http://localhost:${PORT}/uploads/`);
-    // console.log(`🖼️  API Imágenes Logos: http://localhost:${PORT}/api/images/logos/`);
-    // console.log(`🖼️  API Imágenes Perfiles: http://localhost:${PORT}/api/images/profiles/`);
-    // console.log(`📄 API Documentos: http://localhost:${PORT}/api/documents/`);
-    // console.log(`🥋 Módulos: Auth, Sucursales, Tutores, Alumnos, Pagos`);
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`API disponible en: http://localhost:${PORT}`);
 });
 
 module.exports = app;

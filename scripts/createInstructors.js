@@ -9,14 +9,14 @@ const createInstructors = async () => {
   try {
     // Conectar a MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
-    // console.log('✅ Conectado a MongoDB');
+    // console.log('Conectado a MongoDB');
 
     // Verificar cuántos instructores ya existen
     const existingInstructors = await User.find({ role: 'instructor' });
-    // console.log(`📊 Instructores existentes: ${existingInstructors.length}`);
+    // console.log(`Instructores existentes: ${existingInstructors.length}`);
 
     if (existingInstructors.length >= 3) {
-      console.log('⚠️  Ya hay suficientes instructores. No es necesario crear más.');
+      console.log('Ya hay suficientes instructores. No es necesario crear más.');
       return;
     }
 
@@ -58,7 +58,7 @@ const createInstructors = async () => {
       const existingUser = await User.findOne({ email: instructorData.email });
       
       if (existingUser) {
-        console.log(`⚠️  El instructor ${instructorData.name} ya existe`);
+        console.log(`El instructor ${instructorData.name} ya existe`);
         continue;
       }
 
@@ -66,26 +66,26 @@ const createInstructors = async () => {
       const instructor = new User(instructorData);
       await instructor.save();
       
-      console.log(`✅ Instructor creado: ${instructorData.name} (${instructorData.email})`);
+      console.log(`Instructor creado: ${instructorData.name} (${instructorData.email})`);
     }
 
-    // console.log('🎉 Instructores de prueba creados exitosamente!');
+    // console.log('Instructores de prueba creados exitosamente!');
     // console.log('');
-    // console.log('📧 Credenciales de acceso:');
+    // console.log('Credenciales de acceso:');
     instructorsData.forEach(instructor => {
       console.log(`   ${instructor.name}: ${instructor.email} / instructor123`);
     });
     
   } catch (error) {
-    console.error('❌ Error creando instructores:', error.message);
+    console.error('Error creando instructores:', error.message);
     
     if (error.code === 11000) {
-      console.log('⚠️  Algunos emails ya están en uso');
+      console.log('Algunos emails ya están en uso');
     }
   } finally {
     // Cerrar conexión
     await mongoose.connection.close();
-    console.log('📴 Conexión cerrada');
+    console.log('Conexión cerrada');
     process.exit(0);
   }
 };
