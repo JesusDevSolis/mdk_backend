@@ -656,7 +656,7 @@ const getSucursalesComparativa = async (req, res) => {
     try {
         // Obtener todas las sucursales activas
         const sucursales = await Sucursal.find({ isActive: true })
-            .select('name address')
+            .select('name address phone email')
             .lean();
 
         // Obtener fecha actual y del mes
@@ -704,13 +704,24 @@ const getSucursalesComparativa = async (req, res) => {
 
                 const ingresosMesTotal = ingresosMes.length > 0 ? ingresosMes[0].total : 0;
 
+                // Extraer ciudad de la dirección (asumiendo formato: "Calle, Ciudad, Estado")
+                // Si la dirección tiene comas, tomamos la segunda parte como ciudad
+                let ciudad = 'Sin ciudad';
+                if (sucursal.address && typeof sucursal.address === 'string') {
+                    const addressParts = sucursal.address.split(',').map(part => part.trim());
+                    if (addressParts.length >= 2) {
+                        ciudad = addressParts[1]; // Segunda parte es generalmente la ciudad
+                    } else if (addressParts.length === 1) {
+                        ciudad = addressParts[0]; // Si solo hay una parte, usar esa
+                    }
+                }
+
                 return {
                     _id: sucursal._id,
                     nombre: sucursal.name,
                     direccion: {
-                        ciudad: sucursal.address?.city || 'Sin ciudad',
-                        estado: sucursal.address?.state || 'Sin estado',
-                        calle: sucursal.address?.street || 'Sin dirección'
+                        ciudad: ciudad,
+                        completa: sucursal.address || 'Sin dirección'
                     },
                     totalAlumnos,
                     totalInstructores,
