@@ -245,12 +245,14 @@ horarioSchema.virtual('duracionTexto').get(function() {
 
 // Virtual para calcular lugares disponibles
 horarioSchema.virtual('lugaresDisponibles').get(function() {
+    if (!this.alumnosInscritos) return this.capacidadMaxima || 0;
     const inscritos = this.alumnosInscritos.filter(a => a.activo).length;
     return Math.max(0, this.capacidadMaxima - inscritos);
 });
 
 // Virtual para calcular porcentaje de ocupación
 horarioSchema.virtual('porcentajeOcupacion').get(function() {
+    if (!this.alumnosInscritos) return 0;
     const inscritos = this.alumnosInscritos.filter(a => a.activo).length;
     if (this.capacidadMaxima === 0) return 0;
     return Math.round((inscritos / this.capacidadMaxima) * 100);
@@ -263,6 +265,7 @@ horarioSchema.virtual('estaLleno').get(function() {
 
 // Virtual para obtener número de inscritos activos
 horarioSchema.virtual('numeroInscritos').get(function() {
+    if (!this.alumnosInscritos) return 0;
     return this.alumnosInscritos.filter(a => a.activo).length;
 });
 
