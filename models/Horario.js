@@ -295,10 +295,18 @@ horarioSchema.methods.inscribirAlumno = async function(alumnoId) {
         throw new Error('El horario está lleno');
     }
 
-    // Verificar que el alumno no esté ya inscrito
-    const yaInscrito = this.alumnosInscritos.some(
-        a => a.alumno.toString() === alumnoId.toString() && a.activo
-    );
+    // ✅ CORRECCIÓN: Verificar que el alumno no esté ya inscrito
+    // Manejar correctamente tanto ObjectId como objetos poblados
+    const yaInscrito = this.alumnosInscritos.some(a => {
+        if (!a.activo) return false;
+        
+        // Extraer el ID correctamente (manejar objeto poblado y ObjectId)
+        const inscritoId = (a.alumno && a.alumno._id) 
+            ? a.alumno._id.toString() 
+            : a.alumno.toString();
+        
+        return inscritoId === alumnoId.toString();
+    });
 
     if (yaInscrito) {
         throw new Error('El alumno ya está inscrito en este horario');
