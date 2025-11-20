@@ -37,7 +37,7 @@ const horarioSchema = new mongoose.Schema({
     },
 
     // ===== DÍA Y HORA =====
-    dia: {
+    dias: {
         type: String,
         enum: {
             values: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
@@ -209,7 +209,7 @@ const horarioSchema = new mongoose.Schema({
 );
 
 // ===== ÍNDICES COMPUESTOS =====
-horarioSchema.index({ sucursal: 1, dia: 1, horaInicio: 1 });
+horarioSchema.index({ dias: 1, estado: 1 });
 horarioSchema.index({ instructor: 1, estado: 1 });
 horarioSchema.index({ nivel: 1, estado: 1 });
 horarioSchema.index({ dia: 1, estado: 1 });
@@ -270,7 +270,7 @@ horarioSchema.virtual('numeroInscritos').get(function() {
 
 // Virtual para formato de horario legible
 horarioSchema.virtual('horarioTexto').get(function() {
-    const dias = {
+    const diasMap = {
         'lunes': 'Lunes',
         'martes': 'Martes',
         'miercoles': 'Miércoles',
@@ -280,7 +280,12 @@ horarioSchema.virtual('horarioTexto').get(function() {
         'domingo': 'Domingo'
     };
 
-    return `${dias[this.dia]} ${this.horaInicio} - ${this.horaFin}`;
+    // Si hay múltiples días, mostrarlos separados por coma
+    const diasTexto = this.dias && this.dias.length > 0 
+        ? this.dias.map(d => diasMap[d]).join(', ')
+        : 'Sin día asignado';
+
+    return `${diasTexto} ${this.horaInicio} - ${this.horaFin}`;
 });
 
 // ===== MÉTODOS DE INSTANCIA =====
@@ -371,13 +376,13 @@ horarioSchema.methods.getPublicInfo = function() {
 
 // ===== MÉTODOS ESTÁTICOS =====
 
-// Buscar horarios activos
-horarioSchema.statics.findActive = function(filters = {}) {
-    return this.find({ 
-        isActive: true,
-        estado: 'activo',
-        ...filters 
-    })
+    // Buscar horarios activos
+    horarioSchema.statics.findActive = function(filters = {}) {
+        return this.find({ 
+            isActive: true,
+            estado: 'activo',
+            ...filters 
+        })
         .populate('sucursal', 'name address')
         .populate('instructor', 'name email instructorInfo.belt')
         .populate('alumnosInscritos.alumno', 'firstName lastName enrollment.studentId')
@@ -393,7 +398,7 @@ horarioSchema.statics.findActive = function(filters = {}) {
         })
         .populate('instructor', 'name email')
         .populate('alumnosInscritos.alumno', 'firstName lastName')
-        .sort({ dia: 1, horaInicio: 1 });
+        .sort({ dias: 1, horaInicio: 1 });
     };
 
     // Buscar horarios por instructor
@@ -404,13 +409,13 @@ horarioSchema.statics.findActive = function(filters = {}) {
         })
         .populate('sucursal', 'name address')
         .populate('alumnosInscritos.alumno', 'firstName lastName')
-        .sort({ dia: 1, horaInicio: 1 });
+        .sort({ dias: 1, horaInicio: 1 });
     };
 
     // Buscar horarios por día
     horarioSchema.statics.findByDia = function(dia, filters = {}) {
         return this.find({ 
-            dia: dia,
+            dias: dia, // Busca en el array
             isActive: true,
             estado: 'activo',
             ...filters 
@@ -449,7 +454,7 @@ horarioSchema.statics.findActive = function(filters = {}) {
                 }
             },
             {
-                $sort: { dia: 1, horaInicio: 1 }
+                $sort: { dias: 1, horaInicio: 1 }
             }
         ]);
     };
@@ -521,7 +526,7 @@ horarioSchema.pre('save', async function(next) {
         const conflictos = await this.constructor.find({
             _id: { $ne: this._id },
             instructor: this.instructor,
-            dia: this.dia,
+            dias: { $in: this.dias },
             estado: { $in: ['activo', 'suspendido'] },
             isActive: true,
             $or: [

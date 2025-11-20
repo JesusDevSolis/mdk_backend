@@ -16,7 +16,7 @@ exports.getAllHorarios = async (req, res) => {
             nivel,
             estado = 'activo',
             search,
-            sortBy = 'dia',
+            sortBy = 'dias',
             sortOrder = 'asc'
         } = req.query;
 
@@ -25,7 +25,7 @@ exports.getAllHorarios = async (req, res) => {
 
         if (sucursal) filters.sucursal = sucursal;
         if (instructor) filters.instructor = instructor;
-        if (dia) filters.dia = dia;
+        if (dia) filters.dias = dia;
         if (nivel) filters.nivel = nivel;
         if (estado) filters.estado = estado;
 
@@ -43,13 +43,12 @@ exports.getAllHorarios = async (req, res) => {
 
         // Construir sort
         const sortOptions = {};
-        if (sortBy === 'dia') {
+        if (sortBy === 'dia' || sortBy === 'dias') {
             // Orden personalizado para días de la semana
-            const diasOrden = { lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6, domingo: 7 };
-            sortOptions.dia = 1;
+            sortOptions.dias = 1;
             sortOptions.horaInicio = 1;
         } else {
-        sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+            sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
         }
 
         // Ejecutar query con paginación
