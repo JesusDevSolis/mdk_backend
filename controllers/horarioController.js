@@ -248,6 +248,19 @@ exports.updateHorario = async (req, res) => {
         }
 
         // Actualizar el horario
+        // RETROCOMPATIBILIDAD: Si viene 'dia' (singular), convertir a 'dias' (array)
+        if (updateData.dia && !updateData.dias) {
+            updateData.dias = [updateData.dia];
+            delete updateData.dia; // Eliminar el campo viejo
+        }
+
+        // Si viene 'dias' pero está vacío y hay 'dia', usar 'dia'
+        if ((!updateData.dias || updateData.dias.length === 0) && updateData.dia) {
+            updateData.dias = [updateData.dia];
+            delete updateData.dia;
+        }
+
+        // Actualizar el horario
         const horarioActualizado = await Horario.findByIdAndUpdate(
             id,
             updateData,

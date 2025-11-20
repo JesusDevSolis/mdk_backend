@@ -37,15 +37,13 @@ const horarioSchema = new mongoose.Schema({
     },
 
     // ===== DÍA Y HORA =====
-    dias: {
+    dias: [{
         type: String,
         enum: {
             values: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
             message: '{VALUE} no es un día válido'
-        },
-        required: [true, 'El día es requerido'],
-        index: true
-    },
+        }
+    }],
     horaInicio: {
         type: String,
         required: [true, 'La hora de inicio es requerida'],
