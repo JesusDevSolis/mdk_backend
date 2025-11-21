@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 
 // Importar controladores
 const {
@@ -29,6 +30,29 @@ const {
     sanitizeInput
 } = require('../middleware/validation');
 
+// ✅ NUEVO: Middleware flexible para validar MongoID en diferentes parámetros
+const validateParamId = (paramName) => {
+    return (req, res, next) => {
+        const id = req.params[paramName];
+        
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: `El parámetro ${paramName} es requerido`
+            });
+        }
+        
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: `El parámetro ${paramName} no es un ID válido`
+            });
+        }
+        
+        next();
+    };
+};
+
 // ============================================
 // RUTAS ESPECÍFICAS (deben ir antes de /:id)
 // ============================================
@@ -49,7 +73,7 @@ router.get('/estadisticas',
 router.get('/alumno/:alumnoId', 
     authenticate, 
     isInstructor,
-    validateMongoId, 
+    validateParamId('alumnoId'),  // ✅ CORREGIDO: Validar el parámetro correcto
     logAuthRequest, 
     getAsistenciasByAlumno
 );
@@ -60,7 +84,7 @@ router.get('/alumno/:alumnoId',
 router.get('/horario/:horarioId', 
     authenticate, 
     isInstructor,
-    validateMongoId, 
+    validateParamId('horarioId'),  // ✅ CORREGIDO: Validar el parámetro correcto
     logAuthRequest, 
     getAsistenciasByHorario
 );

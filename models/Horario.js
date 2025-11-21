@@ -263,56 +263,53 @@ horarioSchema.virtual('estaLleno').get(function() {
     return this.lugaresDisponibles === 0;
 });
 
-// Virtual para obtener número de inscritos activos
+// Virtual para número de inscritos activos
 horarioSchema.virtual('numeroInscritos').get(function() {
     if (!this.alumnosInscritos) return 0;
     return this.alumnosInscritos.filter(a => a.activo).length;
 });
 
-// Virtual para formato de horario legible
+// Virtual para horario en texto
 horarioSchema.virtual('horarioTexto').get(function() {
-    const diasMap = {
-        'lunes': 'Lunes',
-        'martes': 'Martes',
-        'miercoles': 'Miércoles',
-        'jueves': 'Jueves',
-        'viernes': 'Viernes',
-        'sabado': 'Sábado',
-        'domingo': 'Domingo'
-    };
+    if (!this.horaInicio || !this.horaFin) return '';
+    return `${this.horaInicio} - ${this.horaFin}`;
+});
 
-    // Si hay múltiples días, mostrarlos separados por coma
-    const diasTexto = this.dias && this.dias.length > 0 
-        ? this.dias.map(d => diasMap[d]).join(', ')
-        : 'Sin día asignado';
-
-    return `${diasTexto} ${this.horaInicio} - ${this.horaFin}`;
+// Virtual para días en texto
+horarioSchema.virtual('diasTexto').get(function() {
+    if (!this.dias || this.dias.length === 0) return 'Sin días asignados';
+    
+    const diasCapitalizados = this.dias.map(dia => 
+        dia.charAt(0).toUpperCase() + dia.slice(1)
+    );
+    
+    if (diasCapitalizados.length === 1) {
+        return diasCapitalizados[0];
+    } else if (diasCapitalizados.length === 2) {
+        return diasCapitalizados.join(' y ');
+    } else {
+        const ultimos2 = diasCapitalizados.slice(-2);
+        const primeros = diasCapitalizados.slice(0, -2);
+        return `${primeros.join(', ')}, ${ultimos2.join(' y ')}`;
+    }
 });
 
 // ===== MÉTODOS DE INSTANCIA =====
 
 // Método para inscribir alumno
 horarioSchema.methods.inscribirAlumno = async function(alumnoId) {
-    // Verificar que no esté lleno
-    if (this.estaLleno) {
-        throw new Error('El horario está lleno');
-    }
-
-    // ✅ CORRECCIÓN: Verificar que el alumno no esté ya inscrito
-    // Manejar correctamente tanto ObjectId como objetos poblados
-    const yaInscrito = this.alumnosInscritos.some(a => {
-        if (!a.activo) return false;
-        
-        // Extraer el ID correctamente (manejar objeto poblado y ObjectId)
-        const inscritoId = (a.alumno && a.alumno._id) 
-            ? a.alumno._id.toString() 
-            : a.alumno.toString();
-        
-        return inscritoId === alumnoId.toString();
-    });
-
+    // Verificar que no esté ya inscrito
+    const yaInscrito = this.alumnosInscritos.some(
+        a => a.alumno.toString() === alumnoId.toString() && a.activo
+    );
+    
     if (yaInscrito) {
         throw new Error('El alumno ya está inscrito en este horario');
+    }
+
+    // Verificar capacidad
+    if (this.estaLleno) {
+        throw new Error('El horario está lleno');
     }
 
     // Verificar que el alumno exista y esté activo
@@ -349,7 +346,7 @@ horarioSchema.methods.desinscribirAlumno = async function(alumnoId) {
     return this;
 };
 
-// Método para obtener información pública
+// ✅ MÉTODO CORREGIDO: getPublicInfo con todos los campos necesarios
 horarioSchema.methods.getPublicInfo = function() {
     const obj = this.toObject();
     
@@ -359,15 +356,18 @@ horarioSchema.methods.getPublicInfo = function() {
         instructor: obj.instructor,
         nombre: obj.nombre,
         descripcion: obj.descripcion,
-        dia: obj.dia,
+        dia: obj.dia, // Mantener por compatibilidad
+        dias: obj.dias, // ✅ AGREGADO: Array de días
         horaInicio: obj.horaInicio,
         horaFin: obj.horaFin,
         duracionMinutos: obj.duracionMinutos,
         duracionTexto: obj.duracionTexto,
         horarioTexto: obj.horarioTexto,
+        diasTexto: obj.diasTexto, // ✅ AGREGADO: Texto de días
         nivel: obj.nivel,
         categoria: obj.categoria,
         capacidadMaxima: obj.capacidadMaxima,
+        alumnosInscritos: obj.alumnosInscritos, // ✅ AGREGADO: Array completo de alumnos
         numeroInscritos: obj.numeroInscritos,
         lugaresDisponibles: obj.lugaresDisponibles,
         porcentajeOcupacion: obj.porcentajeOcupacion,
@@ -375,9 +375,13 @@ horarioSchema.methods.getPublicInfo = function() {
         estado: obj.estado,
         fechaInicio: obj.fechaInicio,
         fechaFin: obj.fechaFin,
+        recurrente: obj.recurrente, // ✅ AGREGADO
+        diasRecurrentes: obj.diasRecurrentes, // ✅ AGREGADO
         precio: obj.precio,
         salon: obj.salon,
+        notas: obj.notas, // ✅ AGREGADO
         configuracion: obj.configuracion,
+        isActive: obj.isActive, // ✅ AGREGADO
         createdAt: obj.createdAt,
         updatedAt: obj.updatedAt
     };
@@ -571,13 +575,13 @@ horarioSchema.pre('save', async function(next) {
 
 horarioSchema.post('save', async function(doc) {
     try {
-        console.log(`Horario guardado: ${doc.nombre} - ${doc.horarioTexto}`);
+        console.log(`✅ Horario guardado: ${doc.nombre} - ${doc.horarioTexto}`);
     } catch (error) {
-        console.error('Error en post-save de Horario:', error);
+        console.error('❌ Error en post-save de Horario:', error);
     }
 });
 
 // ===== EXPORTAR MODELO =====
 const Horario = mongoose.model('Horario', horarioSchema);
 
-module.exports = Horario;
+module.exports = Horario;2
