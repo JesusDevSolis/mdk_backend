@@ -115,10 +115,10 @@ router.get('/:id',
 
 // @route   POST /api/horarios
 // @desc    Crear nuevo horario
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.post('/', 
     authenticate, 
-    isInstructor, 
+    isAdmin, // ✅ CORREGIDO: Solo admin
     sanitizeInput, 
     logAuthRequest, 
     createHorario
@@ -126,10 +126,10 @@ router.post('/',
 
 // @route   PUT /api/horarios/:id
 // @desc    Actualizar horario
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.put('/:id', 
     authenticate, 
-    isInstructor,
+    isAdmin, // ✅ CORREGIDO: Solo admin
     validateMongoId, 
     sanitizeInput, 
     logAuthRequest, 
@@ -153,10 +153,10 @@ router.delete('/:id',
 
 // @route   POST /api/horarios/:id/inscribir
 // @desc    Inscribir alumno en horario
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.post('/:id/inscribir', 
     authenticate, 
-    isInstructor,
+    isAdmin, // ✅ CORREGIDO: Solo admin
     validateMongoId, 
     sanitizeInput, 
     logAuthRequest, 
@@ -165,10 +165,10 @@ router.post('/:id/inscribir',
 
 // @route   DELETE /api/horarios/:id/desinscribir/:alumnoId
 // @desc    Desinscribir alumno de horario
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.delete('/:id/desinscribir/:alumnoId', 
     authenticate, 
-    isInstructor,
+    isAdmin, // ✅ CORREGIDO: Solo admin
     validateMongoId, 
     logAuthRequest, 
     desinscribirAlumno
@@ -180,10 +180,10 @@ router.delete('/:id/desinscribir/:alumnoId',
 
 // @route   PUT /api/horarios/:id/estado
 // @desc    Cambiar estado del horario
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.put('/:id/estado', 
     authenticate, 
-    isInstructor,
+    isAdmin, // ✅ CORREGIDO: Solo admin
     validateMongoId, 
     sanitizeInput, 
     logAuthRequest, 
