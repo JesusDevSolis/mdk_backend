@@ -85,8 +85,8 @@ const validateLogin = [
     .notEmpty()
     .withMessage('El email es requerido')
     .isEmail()
-    .withMessage('El email debe tener un formato válido')
-    .normalizeEmail(),
+    .withMessage('El email debe tener un formato válido'),
+    // .normalizeEmail(),
 
   body('password')
     .notEmpty()

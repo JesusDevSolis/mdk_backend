@@ -111,8 +111,16 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 🔍 LOG 1: Ver qué llega del frontend
+    console.log('');
+    console.log('🔍 ===== LOGIN ATTEMPT =====');
+    console.log('📧 Email recibido:', email);
+    console.log('🔑 Password recibido:', password);
+    console.log('📏 Longitud del password:', password?.length);
+
     // Validaciones básicas
     if (!email || !password) {
+      console.log('❌ Validación falló: email o password vacío');
       return res.status(400).json({
         success: false,
         message: 'Email y contraseña son requeridos'
@@ -120,32 +128,71 @@ const login = async (req, res) => {
     }
 
     // Buscar usuario con contraseña
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const emailLowerCase = email.toLowerCase();
+    console.log('🔍 Buscando usuario con email:', emailLowerCase);
+    
+    const user = await User.findOne({ email: emailLowerCase }).select('+password');
     
     if (!user) {
+      console.log('❌ Usuario NO encontrado en BD');
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas'
       });
     }
 
+    // 🔍 LOG 2: Usuario encontrado
+    console.log('✅ Usuario encontrado:');
+    console.log('  - ID:', user._id);
+    console.log('  - Nombre:', user.name);
+    console.log('  - Email:', user.email);
+    console.log('  - Rol:', user.role);
+    console.log('  - Activo:', user.isActive);
+    console.log('  - Hash almacenado:', user.password);
+
     // Verificar si el usuario está activo
     if (!user.isActive) {
+      console.log('❌ Usuario inactivo');
       return res.status(401).json({
         success: false,
         message: 'Cuenta desactivada. Contacta al administrador'
       });
     }
 
+    // 🔍 LOG 3: Comparar contraseñas
+    console.log('');
+    console.log('🔐 COMPARANDO CONTRASEÑAS:');
+    console.log('  Password ingresado:', password);
+    console.log('  Password tipo:', typeof password);
+    console.log('  Hash en BD:', user.password);
+    
     // Verificar contraseña
+    console.log('⏳ Ejecutando user.comparePassword...');
     const isPasswordValid = await user.comparePassword(password);
+    console.log('✅ Resultado de comparePassword:', isPasswordValid);
+
+    // 🔍 LOG 4: Probar también con bcrypt.compare directo
+    console.log('');
+    console.log('🧪 PRUEBA ADICIONAL con bcrypt.compare directo:');
+    const directCompare = await bcrypt.compare(password, user.password);
+    console.log('  Resultado directo:', directCompare);
     
     if (!isPasswordValid) {
+      console.log('');
+      console.log('❌ CONTRASEÑA INVÁLIDA');
+      console.log('===========================');
+      console.log('');
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas'
       });
     }
+
+    console.log('');
+    console.log('✅ CONTRASEÑA VÁLIDA');
+    console.log('✅ LOGIN EXITOSO');
+    console.log('===========================');
+    console.log('');
 
     // Actualizar última conexión
     user.lastLogin = new Date();
@@ -165,7 +212,10 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error('');
+    console.error('❌ ERROR EN LOGIN:', error);
+    console.error('Stack:', error.stack);
+    console.error('');
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
