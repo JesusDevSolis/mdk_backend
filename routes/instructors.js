@@ -19,6 +19,7 @@ const {
 const {
     authenticate,
     isAdmin,
+    isInstructor,  // ✅ AGREGADO
     logAuthRequest
 } = require('../middleware/auth');
 
@@ -35,16 +36,13 @@ const storage = multer.diskStorage({
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
-        // Generar nombre único para el archivo
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
         cb(null, 'instructor-' + uniqueSuffix + ext);
     }
 });
 
-// Filtros para multer
 const fileFilter = (req, file, cb) => {
-    // Permitir solo imágenes
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
@@ -60,24 +58,23 @@ const upload = multer({
     }
 });
 
-// Middleware para crear directorio de uploads si no existe
 const ensureUploadDir = async (req, res, next) => {
     try {
         const fs = require('fs').promises;
         const uploadPath = path.join(__dirname, '../uploads/instructors');
         
         try {
-        await fs.access(uploadPath);
+            await fs.access(uploadPath);
         } catch {
-        await fs.mkdir(uploadPath, { recursive: true });
+            await fs.mkdir(uploadPath, { recursive: true });
         }
         
         next();
     } catch (error) {
         console.error('Error creando directorio de uploads:', error);
         res.status(500).json({
-        success: false,
-        message: 'Error del servidor al preparar subida de archivos'
+            success: false,
+            message: 'Error del servidor al preparar subida de archivos'
         });
     }
 };
@@ -88,10 +85,11 @@ const ensureUploadDir = async (req, res, next) => {
 
 // @route   GET /api/instructores/sucursal/:sucursalId
 // @desc    Obtener instructores por sucursal
-// @access  Private (Admin only)
+// @access  Private (Admin, Instructor)
+// ✅ CORREGIDO: Ahora instructores pueden ver
 router.get('/sucursal/:sucursalId', 
     authenticate, 
-    isAdmin,
+    isInstructor,  // ✅ Cambio: Admin O Instructor
     validateMongoId, 
     logAuthRequest, 
     getInstructoresBySucursal
@@ -103,20 +101,22 @@ router.get('/sucursal/:sucursalId',
 
 // @route   GET /api/instructores
 // @desc    Obtener todos los instructores
-// @access  Private (Admin only)
+// @access  Private (Admin, Instructor)
+// ✅ CORREGIDO: Instructores pueden ver lista (para asignar horarios)
 router.get('/', 
     authenticate, 
-    isAdmin, 
+    isInstructor,  // ✅ Cambio: Admin O Instructor
     logAuthRequest, 
     getAllInstructores
 );
 
 // @route   GET /api/instructores/:id
 // @desc    Obtener instructor por ID
-// @access  Private (Admin only)
+// @access  Private (Admin, Instructor)
+// ✅ CORREGIDO: Instructores pueden ver detalles
 router.get('/:id', 
     authenticate, 
-    isAdmin,
+    isInstructor,  // ✅ Cambio: Admin O Instructor
     validateMongoId, 
     logAuthRequest, 
     getInstructorById
@@ -125,9 +125,10 @@ router.get('/:id',
 // @route   POST /api/instructores
 // @desc    Crear nuevo instructor
 // @access  Private (Admin only)
+// ✅ CORRECTO: Solo admin puede crear
 router.post('/', 
     authenticate, 
-    isAdmin, 
+    isAdmin,  // ✅ Mantener: Solo Admin
     sanitizeInput, 
     logAuthRequest, 
     createInstructor
@@ -136,9 +137,10 @@ router.post('/',
 // @route   PUT /api/instructores/:id
 // @desc    Actualizar instructor
 // @access  Private (Admin only)
+// ✅ CORRECTO: Solo admin puede editar
 router.put('/:id', 
     authenticate, 
-    isAdmin,
+    isAdmin,  // ✅ Mantener: Solo Admin
     validateMongoId, 
     sanitizeInput, 
     logAuthRequest, 
@@ -148,9 +150,10 @@ router.put('/:id',
 // @route   DELETE /api/instructores/:id
 // @desc    Eliminar instructor (soft delete)
 // @access  Private (Admin only)
+// ✅ CORRECTO: Solo admin puede eliminar
 router.delete('/:id', 
     authenticate, 
-    isAdmin, 
+    isAdmin,  // ✅ Mantener: Solo Admin
     validateMongoId, 
     logAuthRequest, 
     deleteInstructor
@@ -185,8 +188,6 @@ router.get('/:id/estadisticas',
 // @route   POST /api/instructores/:id/photo
 // @desc    Subir foto de perfil de instructor
 // @access  Private (Admin only)
-// NOTA: Esta funcionalidad está preparada pero el endpoint de actualización 
-// está en el updateInstructor. Se puede implementar endpoint separado si se necesita.
 router.post('/:id/photo', 
     authenticate, 
     isAdmin,
@@ -195,8 +196,6 @@ router.post('/:id/photo',
     upload.single('photo'),
     logAuthRequest,
     (req, res) => {
-        // Por ahora solo retornar la URL del archivo subido
-        // El update completo se hace con updateInstructor
         if (!req.file) {
             return res.status(400).json({
                 success: false,
@@ -221,7 +220,6 @@ router.post('/:id/photo',
 // MIDDLEWARE DE MANEJO DE ERRORES
 // ============================================
 
-// Middleware para manejo de errores de multer
 router.use((error, req, res, next) => {
     if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
@@ -241,8 +239,8 @@ router.use((error, req, res, next) => {
     
     if (error.message === 'Solo se permiten archivos de imagen') {
         return res.status(400).json({
-        success: false,
-        message: 'Solo se permiten archivos de imagen (JPEG, PNG, GIF).'
+            success: false,
+            message: 'Solo se permiten archivos de imagen (JPEG, PNG, GIF).'
         });
     }
     
