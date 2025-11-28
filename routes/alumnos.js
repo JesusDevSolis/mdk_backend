@@ -122,10 +122,10 @@ router.get('/:id',
 
 // @route   POST /api/alumnos
 // @desc    Crear nuevo alumno
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.post('/', 
   authenticate, 
-  isInstructor, 
+  isAdmin,
   sanitizeInput, 
   validateAlumno, 
   logAuthRequest, 
@@ -134,10 +134,10 @@ router.post('/',
 
 // @route   PUT /api/alumnos/:id
 // @desc    Actualizar alumno
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.put('/:id', 
   authenticate, 
-  isInstructor,
+  isAdmin,
   validateMongoId, 
   sanitizeInput, 
   validateAlumnoUpdate, 
@@ -158,10 +158,10 @@ router.delete('/:id',
 
 // @route   POST /api/alumnos/:id/photo
 // @desc    Subir foto de perfil de alumno
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.post('/:id/photo', 
   authenticate, 
-  isInstructor,
+  isAdmin,
   validateMongoId, 
   ensureUploadDir,
   upload.single('photo'),
@@ -173,10 +173,10 @@ router.post('/:id/photo',
 
 // @route   PUT /api/alumnos/:id/belt
 // @desc    Actualizar cinturón de alumno
-// @access  Private (Admin, Instructor)
+// @access  Private (Admin only)
 router.put('/:id/belt', 
   authenticate, 
-  isInstructor,
+  isAdmin,
   validateMongoId, 
   sanitizeInput, 
   validateBeltUpdate, 

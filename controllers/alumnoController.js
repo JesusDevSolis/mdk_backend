@@ -66,14 +66,13 @@ const getAlumnos = async (req, res) => {
     // Si el usuario no es admin, aplicar filtros según rol
     if (req.user.role !== 'admin') {
       if (req.user.role === 'instructor') {
-        // Los instructores solo pueden ver alumnos de sus sucursales
-        const sucursales = await Sucursal.find({ 
-          manager: req.user._id,
-          isActive: true 
-        }).select('_id');
-        
-        const sucursalIds = sucursales.map(s => s._id);
-        filters['enrollment.sucursal'] = { $in: sucursalIds };
+        // Los instructores solo pueden ver alumnos de SU sucursal asignada
+        if (req.user.sucursal) {
+          filters['enrollment.sucursal'] = req.user.sucursal;
+        } else {
+          // Si el instructor no tiene sucursal asignada, no ve ningún alumno
+          filters['enrollment.sucursal'] = null;
+        }
       }
     }
 
@@ -816,15 +815,16 @@ const getAlumnosStats = async (req, res) => {
       filters['enrollment.sucursal'] = sucursal;
     }
     
-    // Si no es admin, filtrar por sucursales que maneja
+    // ✅ CORREGIDO: Si no es admin, filtrar por su sucursal asignada
     if (req.user.role !== 'admin') {
-      const sucursales = await Sucursal.find({ 
-        manager: req.user._id,
-        isActive: true 
-      }).select('_id');
-      
-      const sucursalIds = sucursales.map(s => s._id);
-      filters['enrollment.sucursal'] = { $in: sucursalIds };
+      if (req.user.role === 'instructor') {
+        if (req.user.sucursal) {
+          filters['enrollment.sucursal'] = req.user.sucursal;
+        } else {
+          // Si el instructor no tiene sucursal asignada, no ve estadísticas
+          filters['enrollment.sucursal'] = null;
+        }
+      }
     }
 
     const [
@@ -897,9 +897,8 @@ const canAccessAlumno = async (user, alumno) => {
   if (user.role === 'admin') return true;
   
   if (user.role === 'instructor') {
-    // Verificar si el instructor maneja la sucursal del alumno
-    const sucursal = await Sucursal.findById(alumno.enrollment.sucursal);
-    return sucursal && sucursal.manager?.toString() === user._id.toString();
+    // ✅ CORREGIDO: Verificar si el alumno pertenece a la sucursal del instructor
+    return alumno.enrollment.sucursal?.toString() === user.sucursal?.toString();
   }
   
   return false;
