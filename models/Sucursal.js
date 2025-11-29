@@ -173,7 +173,6 @@ const sucursalSchema = new mongoose.Schema({
 });
 
 // Indices para mejorar performance
-// ✅ CORREGIDO: name ya tiene unique: true, no necesita índice explícito
 sucursalSchema.index({ isActive: 1 });
 sucursalSchema.index({ createdBy: 1 });
 sucursalSchema.index({ manager: 1 });
@@ -244,6 +243,7 @@ sucursalSchema.methods.getPublicInfo = function() {
     isOpenNow: this.isOpenNow,
     capacityUsed: this.capacityUsed,
     stats: this.stats,
+    manager: this.manager, // ✅ AGREGADO: Para edición del formulario
     createdAt: this.createdAt
   };
 };

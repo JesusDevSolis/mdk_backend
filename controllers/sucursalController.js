@@ -38,9 +38,16 @@ const getSucursales = async (req, res) => {
       ];
     }
 
-    // Si el usuario no es admin, solo puede ver sucursales donde es manager
     if (req.user.role !== 'admin') {
-      filters.manager = req.user._id;
+      if (req.user.role === 'instructor') {
+        // El instructor solo ve LA sucursal donde está asignado
+        if (req.user.sucursal) {
+          filters._id = req.user.sucursal;
+        } else {
+          // Si no tiene sucursal asignada, no ve ninguna
+          filters._id = null;
+        }
+      }
     }
 
     // Calcular skip para paginación
@@ -313,8 +320,6 @@ const updateSucursal = async (req, res) => {
       if (isActive !== undefined) updateData.isActive = isActive;
     }
 
-    // console.log('✅ Datos limpios para actualizar:', updateData);
-
     const updatedSucursal = await Sucursal.findByIdAndUpdate(
       id,
       updateData,
@@ -331,10 +336,6 @@ const updateSucursal = async (req, res) => {
     });
 
   } catch (error) {
-    // console.error('❌ ERROR COMPLETO:', error);
-    // console.error('❌ ERROR MESSAGE:', error.message);
-    // console.error('❌ ERROR NAME:', error.name);
-    
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -450,7 +451,6 @@ const uploadLogo = async (req, res) => {
       try {
         const oldLogoPath = path.join(__dirname, '../uploads/logos', sucursal.logo.filename);
         await fs.unlink(oldLogoPath);
-        // console.log('✅ Logo anterior eliminado');
       } catch (error) {
         console.error('⚠️ Error eliminando logo anterior:', error);
       }
@@ -466,9 +466,6 @@ const uploadLogo = async (req, res) => {
     };
 
     await sucursal.save();
-
-    // console.log('✅ Logo guardado exitosamente');
-    // console.log('  - logoUrl:', sucursal.logoUrl);
 
     res.json({
       success: true,
