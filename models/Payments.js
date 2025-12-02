@@ -432,6 +432,7 @@ paymentSchema.statics.findByTutor = function(tutorId, filters = {}) {
 };
 
 paymentSchema.statics.getStats = async function(filters = {}) {
+  // ✅ Calcular estadísticas por estado
   const stats = await this.aggregate([
     { 
       $match: { 
@@ -448,16 +449,48 @@ paymentSchema.statics.getStats = async function(filters = {}) {
     }
   ]);
 
+  // ✅ NUEVO: Calcular pagos vencidos dinámicamente
+  // Un pago está vencido si: status = 'pendiente' o 'vencido' Y dueDate < hoy
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const vencidos = await this.aggregate([
+    {
+      $match: {
+        isActive: true,
+        status: { $in: ['pendiente', 'vencido'] },
+        dueDate: { $lt: today },
+        ...filters
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        count: { $sum: 1 },
+        total: { $sum: '$total' }
+      }
+    }
+  ]);
+
+  // Construir objeto de stats
+  const byStatus = stats.reduce((acc, item) => {
+    acc[item._id] = {
+      count: item.count,
+      total: item.total
+    };
+    return acc;
+  }, {});
+
+  // ✅ Agregar stats de vencidos (calculados dinámicamente)
+  byStatus.vencido = {
+    count: vencidos[0]?.count || 0,
+    total: vencidos[0]?.total || 0
+  };
+
   return {
     total: stats.reduce((acc, item) => acc + item.count, 0),
     totalAmount: stats.reduce((acc, item) => acc + item.total, 0),
-    byStatus: stats.reduce((acc, item) => {
-      acc[item._id] = {
-        count: item.count,
-        total: item.total
-      };
-      return acc;
-    }, {})
+    byStatus
   };
 };
 
