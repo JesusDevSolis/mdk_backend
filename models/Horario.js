@@ -350,6 +350,21 @@ horarioSchema.methods.desinscribirAlumno = async function(alumnoId) {
 horarioSchema.methods.getPublicInfo = function() {
     const obj = this.toObject();
     
+    // ✅ CALCULAR manualmente los valores que dependen de alumnosInscritos
+    // porque los virtuals pueden no funcionar correctamente después del populate
+    const inscritosActivos = (obj.alumnosInscritos || []).filter(a => a.activo).length;
+    const capacidad = obj.capacidadMaxima || 0;
+    const porcentaje = capacidad > 0 ? Math.round((inscritosActivos / capacidad) * 100) : 0;
+    const disponibles = Math.max(0, capacidad - inscritosActivos);
+    
+    // 🔍 DEBUG
+    console.log('📊 CÁLCULO DE PORCENTAJE:');
+    console.log('  - Total alumnos en array:', obj.alumnosInscritos?.length || 0);
+    console.log('  - Alumnos activos:', inscritosActivos);
+    console.log('  - Capacidad:', capacidad);
+    console.log('  - Porcentaje calculado:', porcentaje);
+    console.log('  - Lugares disponibles:', disponibles);
+    
     return {
         _id: obj._id,
         sucursal: obj.sucursal,
@@ -368,10 +383,10 @@ horarioSchema.methods.getPublicInfo = function() {
         categoria: obj.categoria,
         capacidadMaxima: obj.capacidadMaxima,
         alumnosInscritos: obj.alumnosInscritos, // ✅ AGREGADO: Array completo de alumnos
-        numeroInscritos: obj.numeroInscritos,
-        lugaresDisponibles: obj.lugaresDisponibles,
-        porcentajeOcupacion: obj.porcentajeOcupacion,
-        estaLleno: obj.estaLleno,
+        numeroInscritos: inscritosActivos, // ✅ CALCULADO manualmente
+        lugaresDisponibles: disponibles, // ✅ CALCULADO manualmente
+        porcentajeOcupacion: porcentaje, // ✅ CALCULADO manualmente
+        estaLleno: disponibles === 0, // ✅ CALCULADO manualmente
         estado: obj.estado,
         fechaInicio: obj.fechaInicio,
         fechaFin: obj.fechaFin,

@@ -70,13 +70,22 @@ exports.getAllHorarios = async (req, res) => {
         const hasNextPage = page < totalPages;
         const hasPrevPage = page > 1;
 
-        // Agregar virtuals manualmente (porque usamos .lean())
-        const horariosConVirtuals = horarios.map(h => ({
-            ...h,
-            duracionMinutos: calcularDuracion(h.horaInicio, h.horaFin),
-            numeroInscritos: h.alumnosInscritos.filter(a => a.activo).length,
-            lugaresDisponibles: h.capacidadMaxima - h.alumnosInscritos.filter(a => a.activo).length
-        }));
+        // ✅ CORREGIDO: Agregar virtuals manualmente (porque usamos .lean())
+        const horariosConVirtuals = horarios.map(h => {
+            const inscritosActivos = (h.alumnosInscritos || []).filter(a => a.activo).length;
+            const capacidad = h.capacidadMaxima || 0;
+            const disponibles = Math.max(0, capacidad - inscritosActivos);
+            const porcentaje = capacidad > 0 ? Math.round((inscritosActivos / capacidad) * 100) : 0;
+            
+            return {
+                ...h,
+                duracionMinutos: calcularDuracion(h.horaInicio, h.horaFin),
+                numeroInscritos: inscritosActivos,
+                lugaresDisponibles: disponibles,
+                porcentajeOcupacion: porcentaje, // ✅ AGREGADO
+                estaLleno: disponibles === 0 // ✅ AGREGADO
+            };
+        });
 
         res.status(200).json({
             success: true,
@@ -119,9 +128,22 @@ exports.getHorarioById = async (req, res) => {
             });
         }
 
+        // 🔍 DEBUG: Verificar datos antes de getPublicInfo
+        const inscritosActivos = horario.alumnosInscritos.filter(a => a.activo).length;
+        console.log('🔍 DEBUG getHorarioById:');
+        console.log('  - ID:', id);
+        console.log('  - Alumnos inscritos activos:', inscritosActivos);
+        console.log('  - Capacidad:', horario.capacidadMaxima);
+        console.log('  - Llamando a getPublicInfo()...');
+        
+        const publicInfo = horario.getPublicInfo();
+        
+        console.log('  - porcentajeOcupacion devuelto:', publicInfo.porcentajeOcupacion);
+        console.log('  - numeroInscritos devuelto:', publicInfo.numeroInscritos);
+
         res.status(200).json({
             success: true,
-            data: horario.getPublicInfo()
+            data: publicInfo
         });
     } catch (error) {
         console.error('Error al obtener horario:', error);
