@@ -12,11 +12,17 @@ try {
     limit = 10, 
     search = '', 
     sucursal = '',
-    isActive = ''
+    isActive = '',
+    belt = ''  // ✅ AGREGADO
     } = req.query;
 
     // Construir filtros
     const filters = { role: 'instructor' };
+
+    // ✅ NUEVO: Si el usuario es instructor, solo ve instructores de su sucursal
+    if (req.user.role === 'instructor' && req.user.sucursal) {
+        filters.sucursal = req.user.sucursal;
+    }
 
     // Filtro por búsqueda (nombre o email)
     if (search) {
@@ -34,6 +40,11 @@ try {
     // Filtro por estado activo
     if (isActive !== '') {
     filters.isActive = isActive === 'true';
+    }
+
+    // ✅ NUEVO: Filtro por cinturón
+    if (belt) {
+    filters['instructorInfo.belt'] = { $regex: belt, $options: 'i' };
     }
 
     // Calcular paginación
