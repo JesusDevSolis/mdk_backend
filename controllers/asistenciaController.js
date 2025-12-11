@@ -29,6 +29,24 @@ exports.getAllAsistencias = async (req, res) => {
         if (instructor) filters.instructor = instructor;
         if (estado) filters.estado = estado;
 
+        // ✅ NUEVO: Filtrar por instructor si no es admin
+        if (req.user.role === 'instructor') {
+            // El instructor solo ve asistencias de horarios donde está asignado
+            const horariosInstructor = await Horario.find({ 
+                instructor: req.user._id,
+                isActive: true 
+            }).select('_id');
+            
+            const horarioIds = horariosInstructor.map(h => h._id);
+            
+            if (horarioIds.length > 0) {
+                filters.horario = { $in: horarioIds };
+            } else {
+                // Si no tiene horarios, no ve ninguna asistencia
+                filters.horario = null;
+            }
+        }
+
         // Filtro por rango de fechas
         if (fechaInicio || fechaFin) {
             filters.fecha = {};
