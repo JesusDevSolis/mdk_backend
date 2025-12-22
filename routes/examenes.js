@@ -15,6 +15,8 @@ const {
     getAlumnosElegibles,
     cambiarEstado,
     calificarAlumno,
+    getCalificacionAlumno,
+    getCalificacionesExamen,
     getEstadisticas
 } = require('../controllers/examenController');
 
@@ -80,6 +82,23 @@ router.get(
     authenticate,
     validateParamId('id'),
     getAlumnosElegibles
+);
+
+// GET /api/examenes/:id/calificaciones - Obtener todas las calificaciones del examen
+router.get(
+    '/:id/calificaciones',
+    authenticate,
+    validateParamId('id'),
+    getCalificacionesExamen
+);
+
+// GET /api/examenes/:id/calificaciones/:alumnoId - Obtener calificación de un alumno
+router.get(
+    '/:id/calificaciones/:alumnoId',
+    authenticate,
+    validateParamId('id'),
+    validateParamId('alumnoId'),
+    getCalificacionAlumno
 );
 
 // ========================================

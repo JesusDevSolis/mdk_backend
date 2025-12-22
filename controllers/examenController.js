@@ -755,4 +755,87 @@ exports.calificarAlumno = async (req, res) => {
     }
 };
 
+// ========================================
+// OBTENER CALIFICACIÓN DE UN ALUMNO
+// ========================================
+exports.getCalificacionAlumno = async (req, res) => {
+    try {
+        const { id, alumnoId } = req.params;
+
+        // Validaciones
+        if (!alumnoId) {
+            return res.status(400).json({
+                success: false,
+                message: 'El ID del alumno es requerido'
+            });
+        }
+
+        // Buscar calificación
+        const calificacion = await Calificacion.findOne({
+            examen: id,
+            alumno: alumnoId,
+            isActive: true
+        })
+        .populate('alumno', 'firstName lastName belt')
+        .populate('evaluadoPor', 'name email');
+
+        if (!calificacion) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró calificación para este alumno'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: calificacion
+        });
+
+    } catch (error) {
+        console.error('Error al obtener calificación:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener calificación',
+            error: error.message
+        });
+    }
+};
+
+// ========================================
+// OBTENER TODAS LAS CALIFICACIONES DE UN EXAMEN
+// ========================================
+exports.getCalificacionesExamen = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Buscar todas las calificaciones del examen
+        const calificaciones = await Calificacion.find({
+            examen: id,
+            isActive: true
+        })
+        .populate('alumno', 'firstName lastName belt')
+        .populate('evaluadoPor', 'name email')
+        .sort({ calificacionFinal: -1 }); // Ordenar por calificación descendente
+
+        // Obtener estadísticas
+        const estadisticas = await Calificacion.getEstadisticasExamen(id);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                calificaciones,
+                estadisticas
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al obtener calificaciones:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener calificaciones',
+            error: error.message
+        });
+    }
+};
+
 module.exports = exports;
