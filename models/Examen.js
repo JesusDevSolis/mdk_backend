@@ -241,6 +241,19 @@ const examenSchema = new mongoose.Schema({
         pagosAlCorriente: {
             cumple: { type: Boolean, default: false }
         }
+        },
+        // Calificación
+        calificado: {
+            type: Boolean,
+            default: false
+        },
+        aprobado: {
+            type: Boolean,
+            default: false
+        },
+        calificacionId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Calificacion'
         }
     }],
 

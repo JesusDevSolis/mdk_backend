@@ -14,6 +14,7 @@ const {
     registrarPagoExamen,
     getAlumnosElegibles,
     cambiarEstado,
+    calificarAlumno,
     getEstadisticas
 } = require('../controllers/examenController');
 
@@ -131,6 +132,14 @@ router.post(
     authenticate,
     validateParamId('id'),
     registrarPagoExamen
+);
+
+// POST /api/examenes/:id/calificar - Calificar alumno
+router.post(
+    '/:id/calificar',
+    authenticate,
+    validateParamId('id'),
+    calificarAlumno
 );
 
 // ========================================

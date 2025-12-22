@@ -641,4 +641,118 @@ exports.getEstadisticas = async (req, res) => {
     }
 };
 
+// ========================================
+// CALIFICAR ALUMNO
+// ========================================
+exports.calificarAlumno = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { alumnoId, calificaciones, calificacionFinal, aprobado } = req.body;
+
+        // Validaciones
+        if (!alumnoId) {
+            return res.status(400).json({
+                success: false,
+                message: 'El ID del alumno es requerido'
+            });
+        }
+
+        if (!calificaciones || !Array.isArray(calificaciones) || calificaciones.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Las calificaciones son requeridas'
+            });
+        }
+
+        if (calificacionFinal === undefined || calificacionFinal === null) {
+            return res.status(400).json({
+                success: false,
+                message: 'La calificación final es requerida'
+            });
+        }
+
+        // Buscar examen
+        const examen = await Examen.findById(id);
+        if (!examen) {
+            return res.status(404).json({
+                success: false,
+                message: 'Examen no encontrado'
+            });
+        }
+
+        // Verificar que el alumno esté inscrito
+        const inscripcion = examen.alumnosInscritos.find(
+            i => i.alumno.toString() === alumnoId.toString()
+        );
+
+        if (!inscripcion) {
+            return res.status(400).json({
+                success: false,
+                message: 'El alumno no está inscrito en este examen'
+            });
+        }
+
+        // Crear o actualizar calificación
+        let calificacion = await Calificacion.findOne({
+            examen: id,
+            alumno: alumnoId
+        });
+
+        const calificacionData = {
+            examen: id,
+            alumno: alumnoId,
+            evaluadoPor: req.user._id,
+            fechaEvaluacion: Date.now(),
+            calificacionesPorCategoria: calificaciones.map(cal => ({
+                categoria: cal.categoria,
+                calificacion: cal.puntuacion,
+                peso: cal.peso,
+                observaciones: cal.observaciones || ''
+            })),
+            calificacionFinal,
+            resultado: aprobado ? 'aprobado' : 'reprobado',
+            calificacionMinima: 60, // Puedes hacer esto configurable
+            estado: 'finalizada'
+        };
+
+        if (calificacion) {
+            // Actualizar existente
+            Object.assign(calificacion, calificacionData);
+            calificacion.modificadoPor = req.user._id;
+            await calificacion.save();
+        } else {
+            // Crear nueva
+            calificacion = new Calificacion(calificacionData);
+            await calificacion.save();
+        }
+
+        // Actualizar inscripción en el examen
+        inscripcion.calificado = true;
+        inscripcion.aprobado = aprobado;
+        inscripcion.calificacionId = calificacion._id;
+        
+        examen.modificadoPor = req.user._id;
+        await examen.save();
+
+        // Responder con la calificación creada/actualizada
+        const calificacionCompleta = await Calificacion.findById(calificacion._id)
+            .populate('alumno', 'firstName lastName belt')
+            .populate('evaluadoPor', 'name email');
+
+        res.status(200).json({
+            success: true,
+            message: 'Calificación guardada exitosamente',
+            data: calificacionCompleta
+        });
+
+    } catch (error) {
+        console.error('Error al calificar alumno:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al calificar alumno',
+            error: error.message
+        });
+    }
+};
+
 module.exports = exports;

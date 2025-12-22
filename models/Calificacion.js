@@ -27,9 +27,9 @@ const calificacionSchema = new mongoose.Schema({
             validator: async function(instructorId) {
                 const User = mongoose.model('User');
                 const instructor = await User.findById(instructorId);
-                return instructor && instructor.role === 'instructor';
+                return instructor && (instructor.role === 'instructor' || instructor.role === 'admin');
             },
-            message: 'El evaluador debe ser un instructor'
+            message: 'El evaluador debe ser un instructor o administrador'
         }
     },
 
