@@ -274,6 +274,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/horarios', require('./routes/horarios'));
 app.use('/api/asistencias', require('./routes/asistencias'));
 app.use('/api/examenes', require('./routes/examenes'));
+app.use('/api/graduaciones', require('./routes/graduaciones'));
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
