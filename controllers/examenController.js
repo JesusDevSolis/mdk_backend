@@ -3,7 +3,47 @@ const Calificacion = require('../models/Calificacion');
 const Graduacion = require('../models/Graduacion');
 const Alumno = require('../models/Alumno');
 const User = require('../models/User');
+const Configuracion = require('../models/Configuracion'); // ✅ NUEVO
 const mongoose = require('mongoose');
+
+// ✅ NUEVO: Función helper para obtener valores de configuración
+const getConfigValue = async (clave, valorDefecto) => {
+    try {
+        return await Configuracion.getValor(clave, valorDefecto);
+    } catch (error) {
+        console.warn(`No se pudo obtener configuración ${clave}, usando valor por defecto:`, valorDefecto);
+        return valorDefecto;
+    }
+};
+
+// ========================================
+// ✅ NUEVO: OBTENER CONFIGURACIONES DE EXÁMENES
+// ========================================
+exports.getConfiguracionesExamenes = async (req, res) => {
+    try {
+        const calificacionMinima = await getConfigValue('examen_calificacion_minima', 60);
+        const asistenciaMinima = await getConfigValue('examen_asistencia_minima', 75);
+        const diasMinimosCinturon = await getConfigValue('examen_dias_minimos_cinturon', 90);
+        const costoBase = await getConfigValue('examen_costo_base', 500);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                calificacionMinima,
+                asistenciaMinima,
+                diasMinimosCinturon,
+                costoBase
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener configuraciones:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener configuraciones',
+            error: error.message
+        });
+    }
+};
 
 // ========================================
 // OBTENER TODOS LOS EXÁMENES
@@ -24,10 +64,8 @@ exports.getAllExamenes = async (req, res) => {
             sortOrder = 'desc'
         } = req.query;
 
-        // Construir filtros
         const filters = { isActive: true };
 
-        // Si es instructor, solo ve exámenes de su sucursal
         if (req.user.role === 'instructor' && req.user.sucursal) {
             filters.sucursal = req.user.sucursal;
         } else if (sucursal) {
@@ -38,7 +76,6 @@ exports.getAllExamenes = async (req, res) => {
         if (estado) filters.estado = estado;
         if (cinturonObjetivo) filters.cinturonObjetivo = cinturonObjetivo;
 
-        // Filtro por búsqueda
         if (search) {
             filters.$or = [
                 { nombre: { $regex: search, $options: 'i' } },
@@ -46,7 +83,6 @@ exports.getAllExamenes = async (req, res) => {
             ];
         }
 
-        // Filtro por rango de fechas
         if (fechaInicio || fechaFin) {
             filters.fecha = {};
             if (fechaInicio) {
@@ -61,24 +97,19 @@ exports.getAllExamenes = async (req, res) => {
             }
         }
 
-        // Calcular skip para paginación
         const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        // Construir sort
         const sort = {};
         sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-        // Obtener exámenes
         const examenes = await Examen.find(filters)
-                        .populate('sucursal', 'name address')
-                        .populate('instructores', 'name email')
-                        .populate('creadoPor', 'name email')
-                        .sort(sort)
-                        .limit(parseInt(limit))
-                        .skip(skip)
-                        .lean();
+            .populate('sucursal', 'name address')
+            .populate('instructores', 'name email')
+            .populate('creadoPor', 'name email')
+            .sort(sort)
+            .limit(parseInt(limit))
+            .skip(skip)
+            .lean();
 
-        // Contar total
         const total = await Examen.countDocuments(filters);
 
         res.status(200).json({
@@ -91,7 +122,6 @@ exports.getAllExamenes = async (req, res) => {
                 limit: parseInt(limit)
             }
         });
-
     } catch (error) {
         console.error('Error al obtener exámenes:', error);
         res.status(500).json({
@@ -110,15 +140,11 @@ exports.getExamenById = async (req, res) => {
         const { id } = req.params;
 
         const examen = await Examen.findById(id)
-                        .populate('sucursal', 'name address phone')
-                        .populate('instructores', 'name email phone')
-                        .populate('creadoPor', 'name email')
-                        .populate('modificadoPor', 'name email')
-                        .populate({
-                            path: 'alumnosInscritos.alumno',
-                            select: 'firstName lastName belt email phone'
-                        })
-                        .lean();
+            .populate('sucursal', 'name address')
+            .populate('instructores', 'name email belt')
+            .populate('alumnosInscritos.alumno', 'firstName lastName belt email enrollment.studentId')
+            .populate('creadoPor', 'name email')
+            .lean();
 
         if (!examen) {
             return res.status(404).json({
@@ -127,7 +153,6 @@ exports.getExamenById = async (req, res) => {
             });
         }
 
-        // Verificar permisos de instructor
         if (req.user.role === 'instructor' && req.user.sucursal) {
             if (examen.sucursal._id.toString() !== req.user.sucursal.toString()) {
                 return res.status(403).json({
@@ -141,7 +166,6 @@ exports.getExamenById = async (req, res) => {
             success: true,
             data: examen
         });
-
     } catch (error) {
         console.error('Error al obtener examen:', error);
         res.status(500).json({
@@ -153,34 +177,40 @@ exports.getExamenById = async (req, res) => {
 };
 
 // ========================================
-// CREAR EXAMEN
+// CREAR NUEVO EXAMEN (✅ INTEGRADO CON CONFIGURACIÓN)
 // ========================================
 exports.createExamen = async (req, res) => {
     try {
+        // ✅ Obtener valores de configuración
+        const costoBasePorDefecto = await getConfigValue('examen_costo_base', 500);
+        const asistenciaMinimaDefecto = await getConfigValue('examen_asistencia_minima', 75);
+        const diasMinimosCinturonDefecto = await getConfigValue('examen_dias_minimos_cinturon', 90);
+
         const examenData = {
             ...req.body,
-            creadoPor: req.user._id
+            creadoPor: req.user._id,
+            costoExamen: req.body.costoExamen || costoBasePorDefecto,
+            requisitos: {
+                asistenciaMinima: req.body.requisitos?.asistenciaMinima || asistenciaMinimaDefecto,
+                diasMinimosCinturon: req.body.requisitos?.diasMinimosCinturon || diasMinimosCinturonDefecto,
+                pagosAlCorriente: req.body.requisitos?.pagosAlCorriente !== undefined ? req.body.requisitos.pagosAlCorriente : true,
+                costoExamen: req.body.requisitos?.costoExamen || costoBasePorDefecto
+            }
         };
 
-        // Si es instructor, asignar su sucursal automáticamente
-        if (req.user.role === 'instructor' && req.user.sucursal) {
-            examenData.sucursal = req.user.sucursal;
-        }
+        const examen = new Examen(examenData);
+        await examen.save();
 
-        const nuevoExamen = new Examen(examenData);
-        await nuevoExamen.save();
-
-        const examenCompleto = await Examen.findById(nuevoExamen._id)
-                                .populate('sucursal', 'name')
-                                .populate('instructores', 'name email')
-                                .lean();
+        const examenCreado = await Examen.findById(examen._id)
+            .populate('sucursal', 'name')
+            .populate('instructores', 'name email')
+            .lean();
 
         res.status(201).json({
             success: true,
             message: 'Examen creado exitosamente',
-            data: examenCompleto
+            data: examenCreado
         });
-
     } catch (error) {
         console.error('Error al crear examen:', error);
         
@@ -216,7 +246,6 @@ exports.updateExamen = async (req, res) => {
             });
         }
 
-        // Verificar permisos de instructor
         if (req.user.role === 'instructor' && req.user.sucursal) {
             if (examen.sucursal.toString() !== req.user.sucursal.toString()) {
                 return res.status(403).json({
@@ -226,7 +255,6 @@ exports.updateExamen = async (req, res) => {
             }
         }
 
-        // Actualizar campos
         Object.keys(req.body).forEach(key => {
             examen[key] = req.body[key];
         });
@@ -235,16 +263,15 @@ exports.updateExamen = async (req, res) => {
         await examen.save();
 
         const examenActualizado = await Examen.findById(id)
-                                .populate('sucursal', 'name')
-                                .populate('instructores', 'name email')
-                                .lean();
+            .populate('sucursal', 'name')
+            .populate('instructores', 'name email')
+            .lean();
 
         res.status(200).json({
             success: true,
             message: 'Examen actualizado exitosamente',
             data: examenActualizado
         });
-
     } catch (error) {
         console.error('Error al actualizar examen:', error);
         
@@ -265,7 +292,7 @@ exports.updateExamen = async (req, res) => {
 };
 
 // ========================================
-// ELIMINAR EXAMEN (SOFT DELETE)
+// ELIMINAR EXAMEN
 // ========================================
 exports.deleteExamen = async (req, res) => {
     try {
@@ -280,7 +307,6 @@ exports.deleteExamen = async (req, res) => {
             });
         }
 
-        // Solo admin puede eliminar
         if (req.user.role !== 'admin') {
             return res.status(403).json({
                 success: false,
@@ -296,7 +322,6 @@ exports.deleteExamen = async (req, res) => {
             success: true,
             message: 'Examen eliminado exitosamente'
         });
-
     } catch (error) {
         console.error('Error al eliminar examen:', error);
         res.status(500).json({
@@ -308,15 +333,14 @@ exports.deleteExamen = async (req, res) => {
 };
 
 // ========================================
-// INSCRIBIR ALUMNO AL EXAMEN
+// INSCRIBIR ALUMNO (✅ INTEGRADO CON CONFIGURACIÓN)
 // ========================================
 exports.inscribirAlumno = async (req, res) => {
     try {
-        const { id } = req.params; // ID del examen
+        const { id } = req.params;
         const { alumnoId, descuento, autorizadoSinPago, motivoAutorizacion } = req.body;
 
         const examen = await Examen.findById(id);
-
         if (!examen) {
             return res.status(404).json({
                 success: false,
@@ -324,7 +348,6 @@ exports.inscribirAlumno = async (req, res) => {
             });
         }
 
-        // Verificar que el alumno existe
         const alumno = await Alumno.findById(alumnoId);
         if (!alumno) {
             return res.status(404).json({
@@ -333,7 +356,6 @@ exports.inscribirAlumno = async (req, res) => {
             });
         }
 
-        // Verificar que el alumno tiene el cinturón correcto
         if (examen.tipo === 'graduacion') {
             if (alumno.belt.level !== examen.cinturonActualRequerido) {
                 return res.status(400).json({
@@ -343,7 +365,34 @@ exports.inscribirAlumno = async (req, res) => {
             }
         }
 
-        // Inscribir alumno
+        // ✅ Verificar requisitos con configuración
+        const asistenciaMinima = await getConfigValue('examen_asistencia_minima', 75);
+        const diasMinimosCinturon = await getConfigValue('examen_dias_minimos_cinturon', 90);
+
+        const porcentajeAsistencia = alumno.stats?.attendancePercentage || 0;
+        if (porcentajeAsistencia < asistenciaMinima && !autorizadoSinPago) {
+            return res.status(400).json({
+                success: false,
+                message: `El alumno no cumple el requisito de asistencia mínima (${asistenciaMinima}%). Actual: ${porcentajeAsistencia}%`,
+                requisito: 'asistencia',
+                requerido: asistenciaMinima,
+                actual: porcentajeAsistencia
+            });
+        }
+
+        if (alumno.belt?.date) {
+            const diasConCinturon = Math.floor((Date.now() - new Date(alumno.belt.date).getTime()) / (1000 * 60 * 60 * 24));
+            if (diasConCinturon < diasMinimosCinturon && !autorizadoSinPago) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El alumno no cumple el requisito de días mínimos con el cinturón (${diasMinimosCinturon} días). Actual: ${diasConCinturon} días`,
+                    requisito: 'diasCinturon',
+                    requerido: diasMinimosCinturon,
+                    actual: diasConCinturon
+                });
+            }
+        }
+
         await examen.inscribirAlumno(alumnoId, {
             descuento: descuento || 0,
             autorizadoSinPago: autorizadoSinPago || false,
@@ -352,36 +401,32 @@ exports.inscribirAlumno = async (req, res) => {
         });
 
         const examenActualizado = await Examen.findById(id)
-                                    .populate({
-                                        path: 'alumnosInscritos.alumno',
-                                        select: 'firstName lastName belt'
-                                    })
-                                    .lean();
+            .populate('alumnosInscritos.alumno', 'firstName lastName belt')
+            .lean();
 
         res.status(200).json({
             success: true,
             message: 'Alumno inscrito exitosamente',
             data: examenActualizado
         });
-
     } catch (error) {
         console.error('Error al inscribir alumno:', error);
-        res.status(400).json({
+        res.status(500).json({
             success: false,
-            message: error.message || 'Error al inscribir alumno'
+            message: 'Error al inscribir alumno',
+            error: error.message
         });
     }
 };
 
 // ========================================
-// DESINSCRIBIR ALUMNO DEL EXAMEN
+// DESINSCRIBIR ALUMNO
 // ========================================
 exports.desinscribirAlumno = async (req, res) => {
     try {
         const { id, alumnoId } = req.params;
 
         const examen = await Examen.findById(id);
-
         if (!examen) {
             return res.status(404).json({
                 success: false,
@@ -389,21 +434,28 @@ exports.desinscribirAlumno = async (req, res) => {
             });
         }
 
-        // Verificar si hay calificación registrada
-        const calificacionExistente = await Calificacion.findOne({
-            examen: id,
-            alumno: alumnoId,
-            isActive: true
-        });
+        if (examen.estado === 'completado') {
+            return res.status(400).json({
+                success: false,
+                message: 'No se puede desinscribir alumnos de un examen completado'
+            });
+        }
 
-        if (calificacionExistente) {
+        const inscripcion = examen.alumnosInscritos.find(i => i.alumno.toString() === alumnoId);
+        if (!inscripcion) {
+            return res.status(400).json({
+                success: false,
+                message: 'El alumno no está inscrito en este examen'
+            });
+        }
+
+        if (inscripcion.calificado) {
             return res.status(400).json({
                 success: false,
                 message: 'No se puede desinscribir. El alumno ya tiene calificación registrada'
             });
         }
 
-        // Remover del array
         examen.alumnosInscritos = examen.alumnosInscritos.filter(
             inscrito => inscrito.alumno.toString() !== alumnoId
         );
@@ -414,7 +466,6 @@ exports.desinscribirAlumno = async (req, res) => {
             success: true,
             message: 'Alumno desinscrito exitosamente'
         });
-
     } catch (error) {
         console.error('Error al desinscribir alumno:', error);
         res.status(500).json({
@@ -430,11 +481,10 @@ exports.desinscribirAlumno = async (req, res) => {
 // ========================================
 exports.registrarPagoExamen = async (req, res) => {
     try {
-        const { id } = req.params; // ID del examen
+        const { id } = req.params;
         const { alumnoId, montoPagado, referenciaPago } = req.body;
 
         const examen = await Examen.findById(id);
-
         if (!examen) {
             return res.status(404).json({
                 success: false,
@@ -445,18 +495,17 @@ exports.registrarPagoExamen = async (req, res) => {
         await examen.registrarPagoExamen(alumnoId, montoPagado, referenciaPago);
 
         const examenActualizado = await Examen.findById(id)
-                                    .populate({
-                                        path: 'alumnosInscritos.alumno',
-                                        select: 'firstName lastName'
-                                    })
-                                    .lean();
+            .populate({
+                path: 'alumnosInscritos.alumno',
+                select: 'firstName lastName'
+            })
+            .lean();
 
         res.status(200).json({
             success: true,
             message: 'Pago registrado exitosamente',
             data: examenActualizado
         });
-
     } catch (error) {
         console.error('Error al registrar pago:', error);
         res.status(400).json({
@@ -467,14 +516,13 @@ exports.registrarPagoExamen = async (req, res) => {
 };
 
 // ========================================
-// OBTENER ALUMNOS ELEGIBLES PARA EXAMEN
+// OBTENER ALUMNOS ELEGIBLES
 // ========================================
 exports.getAlumnosElegibles = async (req, res) => {
     try {
         const { id } = req.params;
 
         const examen = await Examen.findById(id);
-
         if (!examen) {
             return res.status(404).json({
                 success: false,
@@ -482,47 +530,64 @@ exports.getAlumnosElegibles = async (req, res) => {
             });
         }
 
-        // Filtros base
         const filters = {
             isActive: true,
             'enrollment.sucursal': examen.sucursal
         };
 
-        // Si es examen de graduación, filtrar por cinturón
         if (examen.tipo === 'graduacion') {
             filters['belt.level'] = examen.cinturonActualRequerido;
         }
 
-        // Obtener alumnos
         let alumnosElegibles = await Alumno.find(filters)
-                                .select('firstName lastName belt email phone enrollment')
-                                .lean();
+            .select('firstName lastName belt email phone enrollment stats')
+            .lean();
 
-        // Filtrar alumnos ya inscritos
         const alumnosInscritosIds = examen.alumnosInscritos.map(
-                                        i => i.alumno.toString()
-                                    );
+            i => i.alumno.toString()
+        );
 
         alumnosElegibles = alumnosElegibles.filter(
-                                        alumno => !alumnosInscritosIds.includes(alumno._id.toString())
-                                    );
-
-        // Verificar requisitos para cada alumno
-        const alumnosConRequisitos = await Promise.all(
-            alumnosElegibles.map(async (alumno) => {
-                const requisitos = await examen.verificarRequisitosAlumno(alumno._id);
-                return {
-                    ...alumno,
-                    cumpleRequisitos: requisitos
-                };
-            })
+            alumno => !alumnosInscritosIds.includes(alumno._id.toString())
         );
+
+        // ✅ Verificar requisitos con configuración
+        const asistenciaMinima = await getConfigValue('examen_asistencia_minima', 75);
+        const diasMinimosCinturon = await getConfigValue('examen_dias_minimos_cinturon', 90);
+
+        const alumnosConRequisitos = alumnosElegibles.map((alumno) => {
+            const porcentajeAsistencia = alumno.stats?.attendancePercentage || 0;
+            const cumpleAsistencia = porcentajeAsistencia >= asistenciaMinima;
+
+            let cumpleDiasCinturon = true;
+            let diasConCinturon = 0;
+            if (alumno.belt?.date) {
+                diasConCinturon = Math.floor((Date.now() - new Date(alumno.belt.date).getTime()) / (1000 * 60 * 60 * 24));
+                cumpleDiasCinturon = diasConCinturon >= diasMinimosCinturon;
+            }
+
+            return {
+                ...alumno,
+                cumpleRequisitos: cumpleAsistencia && cumpleDiasCinturon,
+                requisitosDetalle: {
+                    asistencia: {
+                        cumple: cumpleAsistencia,
+                        actual: porcentajeAsistencia,
+                        requerido: asistenciaMinima
+                    },
+                    diasCinturon: {
+                        cumple: cumpleDiasCinturon,
+                        actual: diasConCinturon,
+                        requerido: diasMinimosCinturon
+                    }
+                }
+            };
+        });
 
         res.status(200).json({
             success: true,
             data: alumnosConRequisitos
         });
-
     } catch (error) {
         console.error('Error al obtener alumnos elegibles:', error);
         res.status(500).json({
@@ -534,7 +599,7 @@ exports.getAlumnosElegibles = async (req, res) => {
 };
 
 // ========================================
-// CAMBIAR ESTADO DEL EXAMEN
+// CAMBIAR ESTADO
 // ========================================
 exports.cambiarEstado = async (req, res) => {
     try {
@@ -551,7 +616,6 @@ exports.cambiarEstado = async (req, res) => {
         }
 
         const examen = await Examen.findById(id);
-
         if (!examen) {
             return res.status(404).json({
                 success: false,
@@ -568,7 +632,6 @@ exports.cambiarEstado = async (req, res) => {
             message: 'Estado actualizado exitosamente',
             data: examen
         });
-
     } catch (error) {
         console.error('Error al cambiar estado:', error);
         res.status(500).json({
@@ -580,7 +643,7 @@ exports.cambiarEstado = async (req, res) => {
 };
 
 // ========================================
-// OBTENER ESTADÍSTICAS DE EXÁMENES
+// OBTENER ESTADÍSTICAS
 // ========================================
 exports.getEstadisticas = async (req, res) => {
     try {
@@ -588,14 +651,12 @@ exports.getEstadisticas = async (req, res) => {
 
         const filters = { isActive: true };
 
-        // Si es instructor, solo su sucursal
         if (req.user.role === 'instructor' && req.user.sucursal) {
             filters.sucursal = req.user.sucursal;
         } else if (sucursal) {
             filters.sucursal = sucursal;
         }
 
-        // Filtro de fechas
         if (fechaInicio || fechaFin) {
             filters.fecha = {};
             if (fechaInicio) filters.fecha.$gte = new Date(fechaInicio);
@@ -621,7 +682,7 @@ exports.getEstadisticas = async (req, res) => {
             totalInscritos: examenes.reduce((sum, e) => sum + e.alumnosInscritos.length, 0),
             totalRecaudado: examenes.reduce((sum, e) => {
                 return sum + e.alumnosInscritos.reduce((total, inscrito) => {
-                return total + (inscrito.pagoExamen?.montoPagado || 0);
+                    return total + (inscrito.pagoExamen?.montoPagado || 0);
                 }, 0);
             }, 0)
         };
@@ -630,7 +691,6 @@ exports.getEstadisticas = async (req, res) => {
             success: true,
             data: estadisticas
         });
-
     } catch (error) {
         console.error('Error al obtener estadísticas:', error);
         res.status(500).json({
@@ -642,14 +702,13 @@ exports.getEstadisticas = async (req, res) => {
 };
 
 // ========================================
-// CALIFICAR ALUMNO
+// CALIFICAR ALUMNO (✅ INTEGRADO CON CONFIGURACIÓN)
 // ========================================
 exports.calificarAlumno = async (req, res) => {
     try {
         const { id } = req.params;
         const { alumnoId, calificaciones, calificacionFinal, aprobado } = req.body;
 
-        // Validaciones
         if (!alumnoId) {
             return res.status(400).json({
                 success: false,
@@ -671,7 +730,6 @@ exports.calificarAlumno = async (req, res) => {
             });
         }
 
-        // Buscar examen
         const examen = await Examen.findById(id);
         if (!examen) {
             return res.status(404).json({
@@ -680,7 +738,6 @@ exports.calificarAlumno = async (req, res) => {
             });
         }
 
-        // Verificar que el alumno esté inscrito
         const inscripcion = examen.alumnosInscritos.find(
             i => i.alumno.toString() === alumnoId.toString()
         );
@@ -692,7 +749,9 @@ exports.calificarAlumno = async (req, res) => {
             });
         }
 
-        // Crear o actualizar calificación
+        // ✅ Obtener calificación mínima de configuración
+        const calificacionMinima = await getConfigValue('examen_calificacion_minima', 60);
+
         let calificacion = await Calificacion.findOne({
             examen: id,
             alumno: alumnoId
@@ -710,31 +769,27 @@ exports.calificarAlumno = async (req, res) => {
                 observaciones: cal.observaciones || ''
             })),
             calificacionFinal,
-            resultado: aprobado ? 'aprobado' : 'reprobado',
-            calificacionMinima: 60, // Puedes hacer esto configurable
+            resultado: calificacionFinal >= calificacionMinima ? 'aprobado' : 'reprobado',
+            calificacionMinima,
             estado: 'finalizada'
         };
 
         if (calificacion) {
-            // Actualizar existente
             Object.assign(calificacion, calificacionData);
             calificacion.modificadoPor = req.user._id;
             await calificacion.save();
         } else {
-            // Crear nueva
             calificacion = new Calificacion(calificacionData);
             await calificacion.save();
         }
 
-        // Actualizar inscripción en el examen
         inscripcion.calificado = true;
-        inscripcion.aprobado = aprobado;
+        inscripcion.aprobado = calificacionFinal >= calificacionMinima;
         inscripcion.calificacionId = calificacion._id;
         
         examen.modificadoPor = req.user._id;
         await examen.save();
 
-        // Responder con la calificación creada/actualizada
         const calificacionCompleta = await Calificacion.findById(calificacion._id)
             .populate('alumno', 'firstName lastName belt')
             .populate('evaluadoPor', 'name email');
@@ -744,7 +799,6 @@ exports.calificarAlumno = async (req, res) => {
             message: 'Calificación guardada exitosamente',
             data: calificacionCompleta
         });
-
     } catch (error) {
         console.error('Error al calificar alumno:', error);
         res.status(500).json({
@@ -762,7 +816,6 @@ exports.getCalificacionAlumno = async (req, res) => {
     try {
         const { id, alumnoId } = req.params;
 
-        // Validaciones
         if (!alumnoId) {
             return res.status(400).json({
                 success: false,
@@ -770,7 +823,6 @@ exports.getCalificacionAlumno = async (req, res) => {
             });
         }
 
-        // Buscar calificación
         const calificacion = await Calificacion.findOne({
             examen: id,
             alumno: alumnoId,
@@ -790,7 +842,6 @@ exports.getCalificacionAlumno = async (req, res) => {
             success: true,
             data: calificacion
         });
-
     } catch (error) {
         console.error('Error al obtener calificación:', error);
         res.status(500).json({
@@ -808,16 +859,14 @@ exports.getCalificacionesExamen = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Buscar todas las calificaciones del examen
         const calificaciones = await Calificacion.find({
             examen: id,
             isActive: true
         })
         .populate('alumno', 'firstName lastName belt')
         .populate('evaluadoPor', 'name email')
-        .sort({ calificacionFinal: -1 }); // Ordenar por calificación descendente
+        .sort({ calificacionFinal: -1 });
 
-        // Obtener estadísticas
         const estadisticas = await Calificacion.getEstadisticasExamen(id);
 
         res.status(200).json({
@@ -827,7 +876,6 @@ exports.getCalificacionesExamen = async (req, res) => {
                 estadisticas
             }
         });
-
     } catch (error) {
         console.error('Error al obtener calificaciones:', error);
         res.status(500).json({

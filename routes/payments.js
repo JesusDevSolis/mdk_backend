@@ -62,6 +62,12 @@ const upload = multer({
 // Aplicar protección a todas las rutas
 router.use(authenticate);
 
+// ===== RUTAS DE CONFIGURACIÓN (✅ NUEVO) =====
+
+// Obtener configuraciones de pagos
+// GET /api/pagos/configuraciones
+router.get('/configuraciones', paymentController.getConfiguracionesPagos);
+
 // ===== RUTAS DE ESTADÍSTICAS Y CONSULTAS ESPECIALES =====
 
 // Obtener estadísticas de pagos
@@ -94,6 +100,10 @@ router.get('/', paymentController.getAllPayments);
 // GET /api/pagos/:id
 router.get('/:id', paymentController.getPaymentById);
 
+// ✅ NUEVO: Calcular recargo para un pago específico
+// GET /api/pagos/:id/calcular-recargo
+router.get('/:id/calcular-recargo', paymentController.calcularRecargo);
+
 // Crear nuevo pago
 // POST /api/pagos
 // Body: { alumno, sucursal, type, amount, dueDate, etc. }
@@ -110,9 +120,9 @@ router.delete('/:id', paymentController.deletePayment);
 
 // ===== RUTAS DE ACCIONES ESPECIALES =====
 
-// Marcar pago como pagado
+// Marcar pago como pagado (✅ INTEGRADO CON RECARGO)
 // PUT /api/pagos/:id/marcar-pagado
-// Body: { paidDate, paymentMethod, paymentReference }
+// Body: { paidDate, paymentMethod, paymentReference, aplicarRecargo }
 router.put('/:id/marcar-pagado', paymentController.markAsPaid);
 
 // Cancelar pago

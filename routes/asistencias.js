@@ -13,7 +13,8 @@ const {
     getAsistenciasByAlumno,
     getAsistenciasByHorario,
     getAsistenciasByFecha,
-    getEstadisticasGenerales
+    getEstadisticasGenerales,
+    getConfiguracionesAsistencias // ✅ NUEVO
 } = require('../controllers/asistenciaController');
 
 // Importar middleware de autenticación
@@ -30,7 +31,7 @@ const {
     sanitizeInput
 } = require('../middleware/validation');
 
-// ✅ NUEVO: Middleware flexible para validar MongoID en diferentes parámetros
+// Middleware flexible para validar MongoID en diferentes parámetros
 const validateParamId = (paramName) => {
     return (req, res, next) => {
         const id = req.params[paramName];
@@ -57,9 +58,16 @@ const validateParamId = (paramName) => {
 // RUTAS ESPECÍFICAS (deben ir antes de /:id)
 // ============================================
 
-// @route   GET /api/asistencias/estadisticas
-// @desc    Obtener estadísticas generales de asistencias
-// @access  Private (Admin, Instructor)
+// ✅ NUEVO: Obtener configuraciones de asistencias
+// GET /api/asistencias/configuraciones
+router.get('/configuraciones', 
+    authenticate, 
+    isInstructor, 
+    getConfiguracionesAsistencias
+);
+
+// Obtener estadísticas generales de asistencias
+// GET /api/asistencias/estadisticas
 router.get('/estadisticas', 
     authenticate, 
     isInstructor, 
@@ -67,31 +75,28 @@ router.get('/estadisticas',
     getEstadisticasGenerales
 );
 
-// @route   GET /api/asistencias/alumno/:alumnoId
-// @desc    Obtener asistencias por alumno
-// @access  Private (Admin, Instructor)
+// Obtener asistencias por alumno
+// GET /api/asistencias/alumno/:alumnoId
 router.get('/alumno/:alumnoId', 
     authenticate, 
     isInstructor,
-    validateParamId('alumnoId'),  // ✅ CORREGIDO: Validar el parámetro correcto
+    validateParamId('alumnoId'),
     logAuthRequest, 
     getAsistenciasByAlumno
 );
 
-// @route   GET /api/asistencias/horario/:horarioId
-// @desc    Obtener asistencias por horario
-// @access  Private (Admin, Instructor)
+// Obtener asistencias por horario
+// GET /api/asistencias/horario/:horarioId
 router.get('/horario/:horarioId', 
     authenticate, 
     isInstructor,
-    validateParamId('horarioId'),  // ✅ CORREGIDO: Validar el parámetro correcto
+    validateParamId('horarioId'),
     logAuthRequest, 
     getAsistenciasByHorario
 );
 
-// @route   GET /api/asistencias/fecha/:fecha
-// @desc    Obtener asistencias por fecha
-// @access  Private (Admin, Instructor)
+// Obtener asistencias por fecha
+// GET /api/asistencias/fecha/:fecha
 router.get('/fecha/:fecha', 
     authenticate, 
     isInstructor, 
@@ -99,9 +104,8 @@ router.get('/fecha/:fecha',
     getAsistenciasByFecha
 );
 
-// @route   POST /api/asistencias/marcar-grupo
-// @desc    Marcar asistencia de grupo (por horario)
-// @access  Private (Admin, Instructor)
+// Marcar asistencia de grupo (por horario)
+// POST /api/asistencias/marcar-grupo
 router.post('/marcar-grupo', 
     authenticate, 
     isInstructor, 
@@ -114,9 +118,8 @@ router.post('/marcar-grupo',
 // RUTAS CRUD PRINCIPALES
 // ============================================
 
-// @route   GET /api/asistencias
-// @desc    Obtener todas las asistencias
-// @access  Private (Admin, Instructor)
+// Obtener todas las asistencias
+// GET /api/asistencias
 router.get('/', 
     authenticate, 
     isInstructor, 
@@ -124,9 +127,8 @@ router.get('/',
     getAllAsistencias
 );
 
-// @route   GET /api/asistencias/:id
-// @desc    Obtener asistencia por ID
-// @access  Private (Admin, Instructor)
+// Obtener asistencia por ID
+// GET /api/asistencias/:id
 router.get('/:id', 
     authenticate, 
     isInstructor,
@@ -135,9 +137,9 @@ router.get('/:id',
     getAsistenciaById
 );
 
-// @route   POST /api/asistencias
-// @desc    Marcar asistencia individual
-// @access  Private (Admin, Instructor)
+// Marcar asistencia individual (✅ INTEGRADO CON TOLERANCIA)
+// POST /api/asistencias
+// Body: { alumnoId, horarioId, fecha, estado, horaRegistro }
 router.post('/', 
     authenticate, 
     isInstructor, 
@@ -146,9 +148,8 @@ router.post('/',
     marcarAsistencia
 );
 
-// @route   PUT /api/asistencias/:id
-// @desc    Actualizar asistencia
-// @access  Private (Admin, Instructor)
+// Actualizar asistencia
+// PUT /api/asistencias/:id
 router.put('/:id', 
     authenticate, 
     isInstructor,
@@ -158,9 +159,8 @@ router.put('/:id',
     updateAsistencia
 );
 
-// @route   DELETE /api/asistencias/:id
-// @desc    Eliminar asistencia
-// @access  Private (Admin only)
+// Eliminar asistencia
+// DELETE /api/asistencias/:id
 router.delete('/:id', 
     authenticate, 
     isAdmin, 

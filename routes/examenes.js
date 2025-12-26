@@ -17,7 +17,8 @@ const {
     calificarAlumno,
     getCalificacionAlumno,
     getCalificacionesExamen,
-    getEstadisticas
+    getEstadisticas,
+    getConfiguracionesExamenes // ✅ NUEVO
 } = require('../controllers/examenController');
 
 // Importar middleware de autenticación
@@ -59,6 +60,14 @@ router.get(
     '/',
     authenticate,
     getAllExamenes
+);
+
+// ✅ NUEVO: GET /api/examenes/configuraciones - Obtener configuraciones de exámenes
+router.get(
+    '/configuraciones',
+    authenticate,
+    isInstructor,
+    getConfiguracionesExamenes
 );
 
 // GET /api/examenes/estadisticas - Obtener estadísticas

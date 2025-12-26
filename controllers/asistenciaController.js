@@ -2,7 +2,75 @@ const Asistencia = require('../models/Asistencia');
 const Alumno = require('../models/Alumno');
 const Horario = require('../models/Horario');
 const User = require('../models/User');
+const Configuracion = require('../models/Configuracion'); // ✅ NUEVO
 const mongoose = require('mongoose');
+
+// ✅ NUEVO: Función helper para obtener valores de configuración
+const getConfigValue = async (clave, valorDefecto) => {
+    try {
+        return await Configuracion.getValor(clave, valorDefecto);
+    } catch (error) {
+        console.warn(`No se pudo obtener configuración ${clave}, usando valor por defecto:`, valorDefecto);
+        return valorDefecto;
+    }
+};
+
+// ✅ NUEVO: Función para determinar estado automáticamente según hora de llegada
+const determinarEstadoAsistencia = async (horaRegistro, horaInicioClase) => {
+    try {
+        // Obtener tolerancia de configuración
+        const toleranciaMinutos = await getConfigValue('asistencia_tolerancia_retardo', 15);
+
+        // Convertir horas a minutos desde medianoche para comparar
+        const [horaR, minR] = horaRegistro.split(':').map(Number);
+        const [horaI, minI] = horaInicioClase.split(':').map(Number);
+
+        const minutosRegistro = horaR * 60 + minR;
+        const minutosInicio = horaI * 60 + minI;
+
+        const diferencia = minutosRegistro - minutosInicio;
+
+        // Determinar estado
+        if (diferencia <= 0) {
+            return 'presente'; // Llegó a tiempo o antes
+        } else if (diferencia <= toleranciaMinutos) {
+            return 'retardo'; // Llegó con retardo dentro de tolerancia
+        } else {
+            return 'ausente'; // Llegó demasiado tarde (fuera de tolerancia)
+        }
+
+    } catch (error) {
+        console.error('Error al determinar estado:', error);
+        return 'presente'; // Default en caso de error
+    }
+};
+
+// ========================================
+// ✅ NUEVO: OBTENER CONFIGURACIONES DE ASISTENCIAS
+// ========================================
+exports.getConfiguracionesAsistencias = async (req, res) => {
+    try {
+        const toleranciaRetardo = await getConfigValue('asistencia_tolerancia_retardo', 15);
+        const diasJustificar = await getConfigValue('asistencia_dias_justificar', 3);
+        const requiereJustificante = await getConfigValue('asistencia_requiere_justificante', false);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                toleranciaRetardo,
+                diasJustificar,
+                requiereJustificante
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener configuraciones:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener configuraciones',
+            error: error.message
+        });
+    }
+};
 
 // ===== OBTENER TODAS LAS ASISTENCIAS =====
 exports.getAllAsistencias = async (req, res) => {
@@ -21,7 +89,6 @@ exports.getAllAsistencias = async (req, res) => {
             sortOrder = 'desc'
         } = req.query;
 
-        // Construir filtros
         const filters = {};
 
         if (alumno) filters.alumno = alumno;
@@ -29,9 +96,8 @@ exports.getAllAsistencias = async (req, res) => {
         if (instructor) filters.instructor = instructor;
         if (estado) filters.estado = estado;
 
-        // ✅ NUEVO: Filtrar por instructor si no es admin
+        // Filtrar por instructor si no es admin
         if (req.user.role === 'instructor') {
-            // El instructor solo ve asistencias de horarios donde está asignado
             const horariosInstructor = await Horario.find({ 
                 instructor: req.user._id,
                 isActive: true 
@@ -42,7 +108,6 @@ exports.getAllAsistencias = async (req, res) => {
             if (horarioIds.length > 0) {
                 filters.horario = { $in: horarioIds };
             } else {
-                // Si no tiene horarios, no ve ninguna asistencia
                 filters.horario = null;
             }
         }
@@ -62,14 +127,10 @@ exports.getAllAsistencias = async (req, res) => {
             }
         }
 
-        // Calcular skip para paginación
         const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        // Construir sort
         const sortOptions = {};
         sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-        // Ejecutar query con paginación
         const asistencias = await Asistencia.find(filters)
             .populate('alumno', 'firstName lastName enrollment.studentId profilePhoto')
             .populate('horario', 'nombre dias horaInicio horaFin sucursal')
@@ -81,10 +142,7 @@ exports.getAllAsistencias = async (req, res) => {
             .skip(skip)
             .lean();
 
-        // Contar total de documentos
         const total = await Asistencia.countDocuments(filters);
-
-        // Calcular información de paginación
         const totalPages = Math.ceil(total / parseInt(limit));
         const hasNextPage = page < totalPages;
         const hasPrevPage = page > 1;
@@ -144,16 +202,16 @@ exports.getAsistenciaById = async (req, res) => {
     }
 };
 
-// ===== MARCAR ASISTENCIA INDIVIDUAL =====
+// ===== MARCAR ASISTENCIA INDIVIDUAL (✅ INTEGRADO CON TOLERANCIA) =====
 exports.marcarAsistencia = async (req, res) => {
     try {
         const { alumnoId, horarioId, fecha, estado, notas, horaRegistro } = req.body;
 
         // Validaciones
-        if (!alumnoId || !horarioId || !estado) {
+        if (!alumnoId || !horarioId) {
             return res.status(400).json({
                 success: false,
-                message: 'Alumno, horario y estado son requeridos'
+                message: 'Alumno y horario son requeridos'
             });
         }
 
@@ -192,11 +250,25 @@ exports.marcarAsistencia = async (req, res) => {
             });
         }
 
-        // Preparar fecha (usar hoy si no se proporciona)
+        // Preparar fecha
         const fechaAsistencia = fecha ? new Date(fecha) : new Date();
         fechaAsistencia.setHours(0, 0, 0, 0);
 
-        // Verificar si ya existe asistencia para este alumno, horario y fecha
+        // ✅ INTEGRACIÓN: Determinar estado automáticamente si se proporciona horaRegistro
+        let estadoFinal = estado;
+        if (horaRegistro && horario.horaInicio && !estado) {
+            estadoFinal = await determinarEstadoAsistencia(horaRegistro, horario.horaInicio);
+        }
+
+        // Si aún no hay estado, se requiere
+        if (!estadoFinal) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere especificar el estado o proporcionar la hora de registro'
+            });
+        }
+
+        // Verificar si ya existe asistencia
         const asistenciaExistente = await Asistencia.findOne({
             alumno: alumnoId,
             horario: horarioId,
@@ -206,8 +278,7 @@ exports.marcarAsistencia = async (req, res) => {
         let asistencia;
 
         if (asistenciaExistente) {
-            // Actualizar asistencia existente
-            asistenciaExistente.estado = estado;
+            asistenciaExistente.estado = estadoFinal;
             asistenciaExistente.modificadoPor = req.user._id;
             asistenciaExistente.fechaModificacion = new Date();
             
@@ -216,13 +287,12 @@ exports.marcarAsistencia = async (req, res) => {
 
             asistencia = await asistenciaExistente.save();
         } else {
-            // Crear nueva asistencia
             asistencia = new Asistencia({
                 alumno: alumnoId,
                 horario: horarioId,
                 instructor: req.user._id,
                 fecha: fechaAsistencia,
-                estado,
+                estado: estadoFinal,
                 notas,
                 horaRegistro,
                 registradoPor: req.user._id
@@ -231,7 +301,6 @@ exports.marcarAsistencia = async (req, res) => {
             await asistencia.save();
         }
 
-        // Obtener asistencia con relaciones pobladas
         const asistenciaCompleta = await Asistencia.findById(asistencia._id)
             .populate('alumno', 'firstName lastName enrollment.studentId profilePhoto')
             .populate('horario', 'nombre dias horaInicio horaFin')
@@ -263,12 +332,11 @@ exports.marcarAsistencia = async (req, res) => {
     }
 };
 
-// ===== MARCAR ASISTENCIA GRUPAL (POR HORARIO) =====
+// ===== MARCAR ASISTENCIA GRUPAL (✅ INTEGRADO CON TOLERANCIA) =====
 exports.marcarAsistenciaGrupo = async (req, res) => {
     try {
         const { horarioId, fecha, asistencias } = req.body;
 
-        // Validaciones
         if (!horarioId || !asistencias || !Array.isArray(asistencias)) {
             return res.status(400).json({
                 success: false,
@@ -276,7 +344,6 @@ exports.marcarAsistenciaGrupo = async (req, res) => {
             });
         }
 
-        // Validar que el horario existe
         const horario = await Horario.findById(horarioId);
         if (!horario) {
             return res.status(404).json({
@@ -285,59 +352,77 @@ exports.marcarAsistenciaGrupo = async (req, res) => {
             });
         }
 
-        // Preparar fecha
         const fechaAsistencia = fecha ? new Date(fecha) : new Date();
         fechaAsistencia.setHours(0, 0, 0, 0);
 
         const resultados = [];
         const errores = [];
 
-        // Procesar cada asistencia
         for (const item of asistencias) {
             try {
-                const { alumnoId, estado, notas } = item;
+                const { alumnoId, estado, notas, horaRegistro } = item;
 
-                if (!alumnoId || !estado) {
+                if (!alumnoId) {
                     errores.push({
                         alumnoId,
-                        error: 'Alumno y estado son requeridos'
+                        error: 'ID de alumno requerido'
                     });
                     continue;
                 }
 
-                // Verificar si ya existe
-                let asistencia = await Asistencia.findOne({
+                // ✅ INTEGRACIÓN: Determinar estado automáticamente
+                let estadoFinal = estado;
+                if (horaRegistro && horario.horaInicio && !estado) {
+                    estadoFinal = await determinarEstadoAsistencia(horaRegistro, horario.horaInicio);
+                }
+
+                if (!estadoFinal) {
+                    errores.push({
+                        alumnoId,
+                        error: 'Estado o hora de registro requeridos'
+                    });
+                    continue;
+                }
+
+                const asistenciaExistente = await Asistencia.findOne({
                     alumno: alumnoId,
                     horario: horarioId,
                     fecha: fechaAsistencia
                 });
 
-                if (asistencia) {
-                    // Actualizar
-                    asistencia.estado = estado;
-                    asistencia.modificadoPor = req.user._id;
-                    asistencia.fechaModificacion = new Date();
-                    if (notas) asistencia.notas = notas;
-                    await asistencia.save();
+                let asistencia;
+
+                if (asistenciaExistente) {
+                    asistenciaExistente.estado = estadoFinal;
+                    asistenciaExistente.modificadoPor = req.user._id;
+                    asistenciaExistente.fechaModificacion = new Date();
+                    
+                    if (notas) asistenciaExistente.notas = notas;
+                    if (horaRegistro) asistenciaExistente.horaRegistro = horaRegistro;
+
+                    asistencia = await asistenciaExistente.save();
                 } else {
-                    // Crear
                     asistencia = new Asistencia({
                         alumno: alumnoId,
                         horario: horarioId,
                         instructor: req.user._id,
                         fecha: fechaAsistencia,
-                        estado,
+                        estado: estadoFinal,
                         notas,
+                        horaRegistro,
                         registradoPor: req.user._id
                     });
+
                     await asistencia.save();
                 }
 
                 resultados.push({
                     alumnoId,
-                    success: true,
-                    asistenciaId: asistencia._id
+                    asistenciaId: asistencia._id,
+                    estado: estadoFinal,
+                    success: true
                 });
+
             } catch (error) {
                 errores.push({
                     alumnoId: item.alumnoId,
@@ -348,10 +433,10 @@ exports.marcarAsistenciaGrupo = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: `Asistencias procesadas: ${resultados.length} exitosas, ${errores.length} errores`,
+            message: `Asistencias procesadas: ${resultados.length} exitosas, ${errores.length} con errores`,
             data: {
                 exitosas: resultados,
-                errores: errores.length > 0 ? errores : undefined
+                errores: errores
             }
         });
     } catch (error) {
@@ -368,9 +453,10 @@ exports.marcarAsistenciaGrupo = async (req, res) => {
 exports.updateAsistencia = async (req, res) => {
     try {
         const { id } = req.params;
-        const { estado, notas, horaRegistro } = req.body;
+        const { estado, notas, horaRegistro, justificacion } = req.body;
 
         const asistencia = await Asistencia.findById(id);
+
         if (!asistencia) {
             return res.status(404).json({
                 success: false,
@@ -378,10 +464,17 @@ exports.updateAsistencia = async (req, res) => {
             });
         }
 
-        // Actualizar campos
         if (estado) asistencia.estado = estado;
         if (notas !== undefined) asistencia.notas = notas;
         if (horaRegistro) asistencia.horaRegistro = horaRegistro;
+        if (justificacion) {
+            asistencia.justificacion = {
+                motivo: justificacion.motivo,
+                documento: justificacion.documento,
+                aprobadoPor: req.user._id,
+                fechaAprobacion: new Date()
+            };
+        }
 
         asistencia.modificadoPor = req.user._id;
         asistencia.fechaModificacion = new Date();
@@ -389,10 +482,8 @@ exports.updateAsistencia = async (req, res) => {
         await asistencia.save();
 
         const asistenciaActualizada = await Asistencia.findById(id)
-            .populate('alumno', 'firstName lastName enrollment.studentId profilePhoto')
+            .populate('alumno', 'firstName lastName enrollment.studentId')
             .populate('horario', 'nombre dias horaInicio horaFin')
-            .populate('instructor', 'name')
-            .populate('registradoPor', 'name')
             .populate('modificadoPor', 'name');
 
         res.status(200).json({
@@ -415,15 +506,14 @@ exports.deleteAsistencia = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const asistencia = await Asistencia.findById(id);
+        const asistencia = await Asistencia.findByIdAndDelete(id);
+
         if (!asistencia) {
             return res.status(404).json({
                 success: false,
                 message: 'Asistencia no encontrada'
             });
         }
-
-        await asistencia.remove();
 
         res.status(200).json({
             success: true,
@@ -443,20 +533,12 @@ exports.deleteAsistencia = async (req, res) => {
 exports.getAsistenciasByAlumno = async (req, res) => {
     try {
         const { alumnoId } = req.params;
-        const { fechaInicio, fechaFin, estado, page = 1, limit = 20 } = req.query;
+        const { fechaInicio, fechaFin, horario } = req.query;
 
-        // Validar que el alumno existe
-        const alumno = await Alumno.findById(alumnoId);
-        if (!alumno) {
-            return res.status(404).json({
-                success: false,
-                message: 'Alumno no encontrado'
-            });
-        }
+        const filters = { alumno: alumnoId };
 
-        // Construir filtros
-        const filters = {};
-        if (estado) filters.estado = estado;
+        if (horario) filters.horario = horario;
+
         if (fechaInicio || fechaFin) {
             filters.fecha = {};
             if (fechaInicio) {
@@ -471,37 +553,33 @@ exports.getAsistenciasByAlumno = async (req, res) => {
             }
         }
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const asistencias = await Asistencia.find(filters)
+            .populate('horario', 'nombre dias horaInicio horaFin')
+            .populate('instructor', 'name')
+            .sort({ fecha: -1 })
+            .lean();
 
-        const asistencias = await Asistencia.findByAlumno(alumnoId, filters)
-            .limit(parseInt(limit))
-            .skip(skip);
-
-        const total = await Asistencia.countDocuments({ alumno: alumnoId, ...filters });
-
-        // Obtener estadísticas
-        const estadisticas = await Asistencia.getEstadisticasAlumno(
-            alumnoId,
-            fechaInicio,
-            fechaFin
-        );
+        const estadisticas = {
+            total: asistencias.length,
+            presente: asistencias.filter(a => a.estado === 'presente').length,
+            retardo: asistencias.filter(a => a.estado === 'retardo').length,
+            ausente: asistencias.filter(a => a.estado === 'ausente').length,
+            justificada: asistencias.filter(a => a.estado === 'justificada').length,
+            porcentajeAsistencia: asistencias.length > 0 
+                ? ((asistencias.filter(a => a.estado === 'presente' || a.estado === 'retardo').length / asistencias.length) * 100).toFixed(2)
+                : 0
+        };
 
         res.status(200).json({
             success: true,
             data: asistencias,
-            estadisticas,
-            pagination: {
-                total,
-                page: parseInt(page),
-                limit: parseInt(limit),
-                totalPages: Math.ceil(total / parseInt(limit))
-            }
+            estadisticas
         });
     } catch (error) {
-        console.error('Error al obtener asistencias del alumno:', error);
+        console.error('Error al obtener asistencias por alumno:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al obtener asistencias',
+            message: 'Error al obtener asistencias del alumno',
             error: error.message
         });
     }
@@ -511,52 +589,33 @@ exports.getAsistenciasByAlumno = async (req, res) => {
 exports.getAsistenciasByHorario = async (req, res) => {
     try {
         const { horarioId } = req.params;
-        const { fecha, estado } = req.query;
+        const { fecha } = req.query;
 
-        // Validar que el horario existe
-        const horario = await Horario.findById(horarioId);
-        if (!horario) {
-            return res.status(404).json({
-                success: false,
-                message: 'Horario no encontrado'
-            });
-        }
+        const filters = { horario: horarioId };
 
-        // Construir filtros
-        const filters = {};
-        if (estado) filters.estado = estado;
         if (fecha) {
             const fechaBusqueda = new Date(fecha);
             fechaBusqueda.setHours(0, 0, 0, 0);
-            
-            const fechaFin = new Date(fecha);
-            fechaFin.setHours(23, 59, 59, 999);
-
-            filters.fecha = {
-                $gte: fechaBusqueda,
-                $lte: fechaFin
-            };
+            filters.fecha = fechaBusqueda;
         }
 
-        const asistencias = await Asistencia.findByHorario(horarioId, filters);
-
-        // Obtener estadísticas
-        const estadisticas = await Asistencia.getEstadisticasHorario(
-            horarioId,
-            fecha
-        );
+        const asistencias = await Asistencia.find(filters)
+            .populate('alumno', 'firstName lastName enrollment.studentId profilePhoto')
+            .populate('instructor', 'name')
+            .populate('registradoPor', 'name')
+            .sort({ fecha: -1 })
+            .lean();
 
         res.status(200).json({
             success: true,
             data: asistencias,
-            estadisticas,
-            total: asistencias.length
+            count: asistencias.length
         });
     } catch (error) {
-        console.error('Error al obtener asistencias del horario:', error);
+        console.error('Error al obtener asistencias por horario:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al obtener asistencias',
+            message: 'Error al obtener asistencias del horario',
             error: error.message
         });
     }
@@ -566,33 +625,27 @@ exports.getAsistenciasByHorario = async (req, res) => {
 exports.getAsistenciasByFecha = async (req, res) => {
     try {
         const { fecha } = req.params;
-        const { horario, sucursal, estado } = req.query;
 
-        const filters = {};
-        if (horario) filters.horario = horario;
-        if (estado) filters.estado = estado;
+        const fechaBusqueda = new Date(fecha);
+        fechaBusqueda.setHours(0, 0, 0, 0);
 
-        let asistencias = await Asistencia.findByFecha(fecha, filters);
-
-        // Filtrar por sucursal si se proporciona
-        if (sucursal) {
-            asistencias = asistencias.filter(a => 
-                a.horario && 
-                a.horario.sucursal && 
-                a.horario.sucursal.toString() === sucursal
-            );
-        }
+        const asistencias = await Asistencia.find({ fecha: fechaBusqueda })
+            .populate('alumno', 'firstName lastName enrollment.studentId profilePhoto')
+            .populate('horario', 'nombre dias horaInicio horaFin sucursal')
+            .populate('instructor', 'name')
+            .sort({ 'horario.horaInicio': 1 })
+            .lean();
 
         res.status(200).json({
             success: true,
             data: asistencias,
-            total: asistencias.length
+            count: asistencias.length
         });
     } catch (error) {
         console.error('Error al obtener asistencias por fecha:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al obtener asistencias',
+            message: 'Error al obtener asistencias de la fecha',
             error: error.message
         });
     }
@@ -601,91 +654,37 @@ exports.getAsistenciasByFecha = async (req, res) => {
 // ===== OBTENER ESTADÍSTICAS GENERALES =====
 exports.getEstadisticasGenerales = async (req, res) => {
     try {
-        const { fechaInicio, fechaFin, sucursal, horario } = req.query;
+        const { sucursal, fechaInicio, fechaFin } = req.query;
 
-        const matchStage = {};
+        const filters = {};
 
-        // Filtros de fecha
         if (fechaInicio || fechaFin) {
-            matchStage.fecha = {};
-            if (fechaInicio) {
-                const inicio = new Date(fechaInicio);
-                inicio.setHours(0, 0, 0, 0);
-                matchStage.fecha.$gte = inicio;
-            }
-            if (fechaFin) {
-                const fin = new Date(fechaFin);
-                fin.setHours(23, 59, 59, 999);
-                matchStage.fecha.$lte = fin;
-            }
+            filters.fecha = {};
+            if (fechaInicio) filters.fecha.$gte = new Date(fechaInicio);
+            if (fechaFin) filters.fecha.$lte = new Date(fechaFin);
         }
 
-        if (horario) matchStage.horario = new mongoose.Types.ObjectId(horario);
+        const asistencias = await Asistencia.find(filters).lean();
 
-        // Pipeline de agregación
-        let pipeline = [
-            { $match: matchStage }
-        ];
-
-        // Si hay filtro por sucursal, hacer lookup
-        if (sucursal) {
-            pipeline.push(
-                {
-                    $lookup: {
-                        from: 'horarios',
-                        localField: 'horario',
-                        foreignField: '_id',
-                        as: 'horarioInfo'
-                    }
-                },
-                {
-                    $unwind: '$horarioInfo'
-                },
-                {
-                    $match: {
-                        'horarioInfo.sucursal': new mongoose.Types.ObjectId(sucursal)
-                    }
-                }
-            );
-        }
-
-        // Agrupar por estado
-        pipeline.push({
-            $group: {
-                _id: '$estado',
-                count: { $sum: 1 }
-            }
-        });
-
-        const stats = await Asistencia.aggregate(pipeline);
-
-        // Procesar resultados
-        const resultado = {
-            total: 0,
-            presente: 0,
-            ausente: 0,
-            justificado: 0,
-            retardo: 0,
-            porcentajeAsistencia: 0
+        const estadisticas = {
+            total: asistencias.length,
+            porEstado: {
+                presente: asistencias.filter(a => a.estado === 'presente').length,
+                retardo: asistencias.filter(a => a.estado === 'retardo').length,
+                ausente: asistencias.filter(a => a.estado === 'ausente').length,
+                justificada: asistencias.filter(a => a.estado === 'justificada').length
+            },
+            porcentajeAsistencia: asistencias.length > 0
+                ? ((asistencias.filter(a => a.estado === 'presente' || a.estado === 'retardo').length / asistencias.length) * 100).toFixed(2)
+                : 0
         };
-
-        stats.forEach(stat => {
-            resultado[stat._id] = stat.count;
-            resultado.total += stat.count;
-        });
-
-        if (resultado.total > 0) {
-            resultado.porcentajeAsistencia = Math.round(
-                ((resultado.presente + resultado.retardo) / resultado.total) * 100
-            );
-        }
 
         res.status(200).json({
             success: true,
-            data: resultado
+            data: estadisticas
         });
     } catch (error) {
-        console.error('Error al obtener estadísticas generales:', error);
+        console.error('Error al obtener estadísticas:', error);
         res.status(500).json({
             success: false,
             message: 'Error al obtener estadísticas',
@@ -693,3 +692,5 @@ exports.getEstadisticasGenerales = async (req, res) => {
         });
     }
 };
+
+module.exports = exports;
