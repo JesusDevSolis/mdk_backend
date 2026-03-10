@@ -449,6 +449,54 @@ const validateAlumno = [
     .withMessage('El email debe tener un formato válido')
     .normalizeEmail(),
 
+  // ── v1.5: campos del formulario físico de inscripción ──
+
+  body('birthPlace')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('El lugar de nacimiento no puede exceder 100 caracteres'),
+
+  body('height')
+    .optional()
+    .isFloat({ min: 0.3, max: 2.5 })
+    .withMessage('La estatura debe estar entre 0.30 y 2.50 metros'),
+
+  body('maritalStatus')
+    .optional()
+    .isIn(['soltero', 'casado', 'divorciado', 'viudo', 'union-libre', 'otro'])
+    .withMessage('Estado civil inválido. Valores: soltero, casado, divorciado, viudo, union-libre, otro'),
+
+  body('occupation')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('La ocupación no puede exceder 100 caracteres'),
+
+  body('gradeLevel')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('El grado escolar no puede exceder 50 caracteres'),
+
+  body('enrollment.programa')
+    .notEmpty()
+    .withMessage('El programa/disciplina es requerido')
+    .isIn(['tae-kwon-do', 'tang-soo-do', 'hapkido', 'gumdo', 'pequenos-dragones'])
+    .withMessage('Programa inválido. Valores: tae-kwon-do, tang-soo-do, hapkido, gumdo, pequenos-dragones'),
+
+  body('enrollment.enrollmentReason')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('El motivo de inscripción no puede exceder 500 caracteres'),
+
+  body('enrollment.recommendedBy')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('El campo "recomendado por" no puede exceder 100 caracteres'),
+
   handleValidationErrors
 ];
 
@@ -492,6 +540,53 @@ const validateAlumnoUpdate = [
     .optional()
     .isMongoId()
     .withMessage('ID de tutor inválido'),
+
+  // ── v1.5: campos del formulario físico de inscripción ──
+
+  body('birthPlace')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('El lugar de nacimiento no puede exceder 100 caracteres'),
+
+  body('height')
+    .optional()
+    .isFloat({ min: 0.3, max: 2.5 })
+    .withMessage('La estatura debe estar entre 0.30 y 2.50 metros'),
+
+  body('maritalStatus')
+    .optional()
+    .isIn(['soltero', 'casado', 'divorciado', 'viudo', 'union-libre', 'otro'])
+    .withMessage('Estado civil inválido. Valores: soltero, casado, divorciado, viudo, union-libre, otro'),
+
+  body('occupation')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('La ocupación no puede exceder 100 caracteres'),
+
+  body('gradeLevel')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('El grado escolar no puede exceder 50 caracteres'),
+
+  body('enrollment.programa')
+    .optional()
+    .isIn(['tae-kwon-do', 'tang-soo-do', 'hapkido', 'gumdo', 'pequenos-dragones'])
+    .withMessage('Programa inválido. Valores: tae-kwon-do, tang-soo-do, hapkido, gumdo, pequenos-dragones'),
+
+  body('enrollment.enrollmentReason')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('El motivo de inscripción no puede exceder 500 caracteres'),
+
+  body('enrollment.recommendedBy')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('El campo "recomendado por" no puede exceder 100 caracteres'),
 
   handleValidationErrors
 ];

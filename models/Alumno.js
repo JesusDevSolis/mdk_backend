@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 
 const alumnoSchema = new mongoose.Schema({
+  // ─────────────────────────────────────────────
   // Información Personal Básica
+  // ─────────────────────────────────────────────
   firstName: {
     type: String,
     required: [true, 'El nombre es requerido'],
@@ -31,8 +33,45 @@ const alumnoSchema = new mongoose.Schema({
     enum: ['masculino', 'femenino', 'otro'],
     required: [true, 'El género es requerido']
   },
-  
+
+  // ── v1.5: Lugar de nacimiento (PDF Solicitud de Ingreso)
+  birthPlace: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'El lugar de nacimiento no puede exceder 100 caracteres']
+  },
+
+  // ── v1.5: Estatura en metros (PDF Solicitud de Ingreso)
+  height: {
+    type: Number,
+    min: [0.3, 'La estatura mínima es 0.30 m'],
+    max: [2.5, 'La estatura máxima es 2.50 m']
+  },
+
+  // ── v1.5: Estado civil (solo para alumnos adultos - PDF TKD)
+  maritalStatus: {
+    type: String,
+    enum: ['soltero', 'casado', 'divorciado', 'viudo', 'union-libre', 'otro'],
+    default: null
+  },
+
+  // ── v1.5: Ocupación (adultos - PDF TKD)
+  occupation: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'La ocupación no puede exceder 100 caracteres']
+  },
+
+  // ── v1.5: Grado escolar (niños/preescolar - PDF Pequeños Dragones)
+  gradeLevel: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'El grado escolar no puede exceder 50 caracteres']
+  },
+
+  // ─────────────────────────────────────────────
   // Información de Contacto (opcional para menores)
+  // ─────────────────────────────────────────────
   email: {
     type: String,
     trim: true,
@@ -77,18 +116,20 @@ const alumnoSchema = new mongoose.Schema({
     }
   },
 
-  // Relación con Tutor/Padre (NUEVA ESTRUCTURA)
+  // ─────────────────────────────────────────────
+  // Relación con Tutor/Padre
+  // ─────────────────────────────────────────────
   tutor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tutor',
     required: function() {
-      return this.isMinor; // Solo requerido si es menor de edad
+      return this.isMinor;
     },
     validate: {
       validator: async function(tutorId) {
-        if (!tutorId && !this.isMinor) return true; // No requerido para mayores
-        if (!tutorId && this.isMinor) return false; // Requerido para menores
-        
+        if (!tutorId && !this.isMinor) return true;
+        if (!tutorId && this.isMinor) return false;
+
         const Tutor = mongoose.model('Tutor');
         const tutor = await Tutor.findById(tutorId);
         return tutor && tutor.isActive;
@@ -96,8 +137,7 @@ const alumnoSchema = new mongoose.Schema({
       message: 'El tutor debe existir y estar activo'
     }
   },
-  
-  // Relación con el tutor
+
   relationshipToTutor: {
     type: String,
     enum: ['hijo', 'hija', 'pupilo', 'padre', 'madre', 'tutor', 'abuelo', 'hermano', 'otro'],
@@ -106,7 +146,9 @@ const alumnoSchema = new mongoose.Schema({
     }
   },
 
-  // Información de Emergencia (adicional al tutor)
+  // ─────────────────────────────────────────────
+  // Información de Emergencia
+  // ─────────────────────────────────────────────
   emergencyContact: {
     name: {
       type: String,
@@ -137,7 +179,9 @@ const alumnoSchema = new mongoose.Schema({
     }
   },
 
+  // ─────────────────────────────────────────────
   // Información Médica
+  // ─────────────────────────────────────────────
   medicalInfo: {
     bloodType: {
       type: String,
@@ -176,7 +220,9 @@ const alumnoSchema = new mongoose.Schema({
     }
   },
 
+  // ─────────────────────────────────────────────
   // Información Académica de Taekwondo
+  // ─────────────────────────────────────────────
   belt: {
     level: {
       type: String,
@@ -211,11 +257,13 @@ const alumnoSchema = new mongoose.Schema({
     },
     certifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User' // Instructor que certificó
+      ref: 'User'
     }
   },
 
+  // ─────────────────────────────────────────────
   // Información de Matrícula
+  // ─────────────────────────────────────────────
   enrollment: {
     sucursal: {
       type: mongoose.Schema.Types.ObjectId,
@@ -245,84 +293,78 @@ const alumnoSchema = new mongoose.Schema({
       type: Number,
       min: [0, 'La cuota de inscripción no puede ser negativa'],
       default: 0
+    },
+
+    // ── v1.5: Programa/Disciplina (PDF Solicitud de Ingreso)
+    // En Paso 1B se creará el modelo Disciplina y se podrá referenciar
+    programa: {
+      type: String,
+      enum: [
+        'tae-kwon-do',
+        'tang-soo-do',
+        'hapkido',
+        'gumdo',
+        'pequenos-dragones'
+      ],
+      default: 'tae-kwon-do',
+      required: [true, 'El programa/disciplina es requerido']
+    },
+
+    // ── v1.5: Motivo de inscripción (PDF Solicitud de Ingreso)
+    enrollmentReason: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'El motivo de inscripción no puede exceder 500 caracteres']
+    },
+
+    // ── v1.5: Recomendado por (PDF Solicitud de Ingreso)
+    recommendedBy: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'El campo "recomendado por" no puede exceder 100 caracteres']
     }
   },
 
+  // ─────────────────────────────────────────────
   // Foto de Perfil
+  // ─────────────────────────────────────────────
   profilePhoto: {
-    filename: {
-      type: String,
-      default: null
-    },
-    originalName: {
-      type: String,
-      default: null
-    },
-    mimetype: {
-      type: String,
-      default: null
-    },
-    size: {
-      type: Number,
-      default: null
-    },
-    url: {
-      type: String,
-      default: null
-    }
+    filename: { type: String, default: null },
+    originalName: { type: String, default: null },
+    mimetype: { type: String, default: null },
+    size: { type: Number, default: null },
+    url: { type: String, default: null }
   },
 
+  // ─────────────────────────────────────────────
   // Estadísticas y Progreso
+  // ─────────────────────────────────────────────
   stats: {
-    attendanceCount: {
-      type: Number,
-      default: 0
-    },
-    totalClasses: {
-      type: Number,
-      default: 0
-    },
+    attendanceCount: { type: Number, default: 0 },
+    totalClasses: { type: Number, default: 0 },
     attendancePercentage: {
       type: Number,
       default: 0,
       min: 0,
       max: 100
     },
-    lastAttendance: {
-      type: Date
-    },
+    lastAttendance: { type: Date },
     graduationTests: {
-      passed: {
-        type: Number,
-        default: 0
-      },
-      failed: {
-        type: Number,
-        default: 0
-      }
+      passed: { type: Number, default: 0 },
+      failed: { type: Number, default: 0 }
     },
     competitions: {
-      participated: {
-        type: Number,
-        default: 0
-      },
-      won: {
-        type: Number,
-        default: 0
-      }
+      participated: { type: Number, default: 0 },
+      won: { type: Number, default: 0 }
     }
   },
 
-  // Configuraciones y Preferencias
+  // ─────────────────────────────────────────────
+  // Preferencias y Notificaciones
+  // ─────────────────────────────────────────────
   preferences: {
-    receiveNotifications: {
-      type: Boolean,
-      default: true
-    },
-    receivePromotions: {
-      type: Boolean,
-      default: true
-    },
+    receiveNotifications: { type: Boolean, default: true },
+    receivePromotions: { type: Boolean, default: true },
     preferredContactMethod: {
       type: String,
       enum: ['email', 'phone', 'whatsapp'],
@@ -330,14 +372,14 @@ const alumnoSchema = new mongoose.Schema({
     }
   },
 
-  // Notas y Observaciones
+  // ─────────────────────────────────────────────
+  // Notas y Auditoría
+  // ─────────────────────────────────────────────
   notes: {
     type: String,
     trim: true,
     maxlength: [1000, 'Las notas no pueden exceder 1000 caracteres']
   },
-
-  // Información de Auditoría
   isActive: {
     type: Boolean,
     default: true
@@ -351,50 +393,49 @@ const alumnoSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }
+
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Índices para mejorar performance
-// ✅ CORREGIDO: email ya tiene unique: true con sparse
-// ✅ CORREGIDO: enrollment.studentId ya tiene unique: true
+// ─────────────────────────────────────────────
+// Índices
+// ─────────────────────────────────────────────
 alumnoSchema.index({ firstName: 1, lastName: 1 });
 alumnoSchema.index({ 'enrollment.sucursal': 1 });
 alumnoSchema.index({ 'enrollment.status': 1 });
+alumnoSchema.index({ 'enrollment.programa': 1 }); // v1.5
 alumnoSchema.index({ 'belt.level': 1 });
 alumnoSchema.index({ tutor: 1 });
 alumnoSchema.index({ createdAt: -1 });
 alumnoSchema.index({ isActive: 1 });
 
-// Virtual para nombre completo
+// ─────────────────────────────────────────────
+// Virtuals
+// ─────────────────────────────────────────────
+
 alumnoSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`.trim();
 });
 
-// Virtual para edad
 alumnoSchema.virtual('age').get(function() {
   if (!this.dateOfBirth) return null;
-  
   const today = new Date();
   const birthDate = new Date(this.dateOfBirth);
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-  
   return age;
 });
 
-// Virtual para determinar si es menor de edad
 alumnoSchema.virtual('isMinor').get(function() {
   return this.age < 18;
 });
 
-// Virtual para URL de foto de perfil
 alumnoSchema.virtual('profilePhotoUrl').get(function() {
   if (this.profilePhoto && this.profilePhoto.url) {
     if (this.profilePhoto.url.startsWith('http')) {
@@ -406,17 +447,14 @@ alumnoSchema.virtual('profilePhotoUrl').get(function() {
   return null;
 });
 
-// Virtual para tiempo de membresía
 alumnoSchema.virtual('membershipDuration').get(function() {
   if (!this.enrollment.enrollmentDate) return null;
-  
   const today = new Date();
   const enrollmentDate = new Date(this.enrollment.enrollmentDate);
   const diffTime = Math.abs(today - enrollmentDate);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const months = Math.floor(diffDays / 30);
   const days = diffDays % 30;
-  
   return {
     totalDays: diffDays,
     months,
@@ -425,7 +463,10 @@ alumnoSchema.virtual('membershipDuration').get(function() {
   };
 });
 
-// Método de instancia para obtener datos públicos
+// ─────────────────────────────────────────────
+// Métodos de Instancia
+// ─────────────────────────────────────────────
+
 alumnoSchema.methods.getPublicInfo = function() {
   return {
     _id: this._id,
@@ -436,6 +477,13 @@ alumnoSchema.methods.getPublicInfo = function() {
     isMinor: this.isMinor,
     dateOfBirth: this.dateOfBirth,
     gender: this.gender,
+    // v1.5
+    birthPlace: this.birthPlace,
+    height: this.height,
+    maritalStatus: this.maritalStatus,
+    occupation: this.occupation,
+    gradeLevel: this.gradeLevel,
+    // ──
     email: this.email,
     phone: this.phone,
     address: this.address,
@@ -456,53 +504,74 @@ alumnoSchema.methods.getPublicInfo = function() {
   };
 };
 
-// Método de instancia para obtener datos completos (solo para admin/instructores)
 alumnoSchema.methods.getFullInfo = function() {
   const publicInfo = this.getPublicInfo();
   return {
     ...publicInfo,
     dateOfBirth: this.dateOfBirth,
     gender: this.gender,
+    birthPlace: this.birthPlace,       // v1.5
+    height: this.height,               // v1.5
+    maritalStatus: this.maritalStatus, // v1.5
+    occupation: this.occupation,       // v1.5
+    gradeLevel: this.gradeLevel,       // v1.5
     address: this.address,
     emergencyContact: this.emergencyContact,
     medicalInfo: this.medicalInfo,
     preferences: this.preferences,
-    notes: this.notes
+    notes: this.notes,
+    createdBy: this.createdBy,
+    lastModifiedBy: this.lastModifiedBy
   };
 };
 
-// Método estático para buscar alumnos activos
+// ─────────────────────────────────────────────
+// Métodos Estáticos
+// ─────────────────────────────────────────────
+
 alumnoSchema.statics.findActive = function(filters = {}) {
-  return this.find({ 
+  return this.find({
     isActive: true,
     'enrollment.status': 'activo',
-    ...filters 
-  }).populate('enrollment.sucursal', 'name')
+    ...filters
+  })
+    .populate('enrollment.sucursal', 'name')
     .populate('belt.certifiedBy', 'name')
     .populate('tutor', 'firstName lastName email phones.primary')
     .populate('createdBy', 'name');
 };
 
-// Método estático para buscar por sucursal
 alumnoSchema.statics.findBySucursal = function(sucursalId) {
-  return this.find({ 
+  return this.find({
     'enrollment.sucursal': sucursalId,
-    isActive: true 
-  }).populate('enrollment.sucursal', 'name')
+    isActive: true
+  })
+    .populate('enrollment.sucursal', 'name')
     .populate('belt.certifiedBy', 'name')
     .populate('tutor', 'firstName lastName email phones.primary');
 };
 
-// Método estático para buscar por tutor
 alumnoSchema.statics.findByTutor = function(tutorId) {
-  return this.find({ 
+  return this.find({
     tutor: tutorId,
-    isActive: true 
-  }).populate('enrollment.sucursal', 'name')
+    isActive: true
+  })
+    .populate('enrollment.sucursal', 'name')
     .populate('belt.certifiedBy', 'name');
 };
 
-// Método para actualizar estadísticas
+// v1.5: Buscar por programa/disciplina
+alumnoSchema.statics.findByPrograma = function(programa, sucursalId = null) {
+  const filters = {
+    'enrollment.programa': programa,
+    isActive: true
+  };
+  if (sucursalId) filters['enrollment.sucursal'] = sucursalId;
+  return this.find(filters)
+    .populate('enrollment.sucursal', 'name')
+    .populate('tutor', 'firstName lastName email phones.primary');
+};
+
 alumnoSchema.methods.updateStats = async function() {
   try {
     this.stats.lastUpdated = new Date();
@@ -514,7 +583,11 @@ alumnoSchema.methods.updateStats = async function() {
   }
 };
 
-// Pre-save middleware para generar studentId
+// ─────────────────────────────────────────────
+// Middleware Pre-Save
+// ─────────────────────────────────────────────
+
+// Generar studentId automático
 alumnoSchema.pre('save', async function(next) {
   if (this.isNew && !this.enrollment.studentId) {
     try {
@@ -523,8 +596,10 @@ alumnoSchema.pre('save', async function(next) {
       const count = await this.constructor.countDocuments({
         'enrollment.sucursal': this.enrollment.sucursal
       }) + 1;
-      
-      const sucursalCode = sucursal ? sucursal.name.substring(0, 3).toUpperCase() : 'TKD';
+
+      const sucursalCode = sucursal
+        ? sucursal.name.substring(0, 3).toUpperCase()
+        : 'MDK';
       this.enrollment.studentId = `${sucursalCode}-${year}-${count.toString().padStart(4, '0')}`;
     } catch (error) {
       console.error('Error generando studentId:', error);
@@ -533,33 +608,24 @@ alumnoSchema.pre('save', async function(next) {
   next();
 });
 
-// Pre-save middleware para validar tutor si es menor
+// Validar tutor para menores
 alumnoSchema.pre('save', function(next) {
-  // Si es menor de edad, debe tener tutor
   if (this.isMinor && !this.tutor) {
     return next(new Error('Los alumnos menores de 18 años deben tener un tutor asignado'));
   }
-  
-  // Si no es menor, no debería tener relación con tutor requerida
-  if (!this.isMinor && this.tutor && this.relationshipToTutor) {
-    // Permitir tutores para mayores, pero no requerir la relación
-  }
-  
   next();
 });
 
-// Middleware para limpiar referencias al eliminar
+// Limpiar referencias al eliminar
 alumnoSchema.pre('remove', async function(next) {
   try {
     console.log(`Eliminando alumno: ${this.fullName}`);
-    // Aquí se limpiarían referencias en otras colecciones (asistencias, pagos, etc.)
     next();
   } catch (error) {
     next(error);
   }
 });
 
-// Exportar el modelo
+// ─────────────────────────────────────────────
 const Alumno = mongoose.model('Alumno', alumnoSchema);
-
 module.exports = Alumno;

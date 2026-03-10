@@ -20,6 +20,7 @@ const getAlumnos = async (req, res) => {
       isActive,
       tutor,
       age,
+      programa,        // v1.5 — filtro por disciplina
       orderBy = 'createdAt',
       order = 'desc'
     } = req.query;
@@ -50,6 +51,11 @@ const getAlumnos = async (req, res) => {
     // Filtro por tutor
     if (tutor) {
       filters.tutor = tutor;
+    }
+
+    // v1.5 — Filtro por programa/disciplina
+    if (programa) {
+      filters['enrollment.programa'] = programa;
     }
     
     // Búsqueda por nombre, email, teléfono o studentId
@@ -307,6 +313,13 @@ const createAlumno = async (req, res) => {
       lastName,
       dateOfBirth,
       gender,
+      // v1.5 — campos del formulario físico
+      birthPlace,
+      height,
+      maritalStatus,
+      occupation,
+      gradeLevel,
+      // ──────────────────────────
       email,
       phone,
       address,
@@ -380,6 +393,13 @@ const createAlumno = async (req, res) => {
       lastName,
       dateOfBirth,
       gender,
+      // v1.5
+      birthPlace,
+      height,
+      maritalStatus,
+      occupation,
+      gradeLevel,
+      // ──────────────
       email,
       phone,
       address,
@@ -454,6 +474,13 @@ const updateAlumno = async (req, res) => {
       lastName,
       dateOfBirth,
       gender,
+      // v1.5 — campos del formulario físico
+      birthPlace,
+      height,
+      maritalStatus,
+      occupation,
+      gradeLevel,
+      // ──────────────────────────
       email,
       phone,
       address,
@@ -541,6 +568,13 @@ const updateAlumno = async (req, res) => {
     if (lastName !== undefined) updateData.lastName = lastName;
     if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
     if (gender !== undefined) updateData.gender = gender;
+    // v1.5
+    if (birthPlace !== undefined) updateData.birthPlace = birthPlace;
+    if (height !== undefined) updateData.height = height;
+    if (maritalStatus !== undefined) updateData.maritalStatus = maritalStatus;
+    if (occupation !== undefined) updateData.occupation = occupation;
+    if (gradeLevel !== undefined) updateData.gradeLevel = gradeLevel;
+    // ──────────────
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
@@ -834,7 +868,8 @@ const getAlumnosStats = async (req, res) => {
       menoresEdad,
       mayoresEdad,
       estadisticasCinturones,
-      estadisticasSucursales
+      estadisticasSucursales,
+      estadisticasProgramas   // v1.5
     ] = await Promise.all([
       Alumno.countDocuments(filters),
       Alumno.countDocuments({ ...filters, 'enrollment.status': 'activo' }),
@@ -865,6 +900,12 @@ const getAlumnosStats = async (req, res) => {
         { $unwind: '$sucursalInfo' },
         { $group: { _id: '$enrollment.sucursal', name: { $first: '$sucursalInfo.name' }, count: { $sum: 1 } } },
         { $sort: { count: -1 } }
+      ]),
+      // v1.5 — Desglose por programa/disciplina
+      Alumno.aggregate([
+        { $match: filters },
+        { $group: { _id: '$enrollment.programa', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
       ])
     ]);
 
@@ -879,7 +920,8 @@ const getAlumnosStats = async (req, res) => {
           mayoresEdad
         },
         cinturones: estadisticasCinturones,
-        sucursales: estadisticasSucursales
+        sucursales: estadisticasSucursales,
+        programas: estadisticasProgramas   // v1.5
       }
     });
 
@@ -922,6 +964,75 @@ const updateSucursalStats = async (sucursalId) => {
   }
 };
 
+// @desc    Obtener alumnos por programa/disciplina
+// @route   GET /api/alumnos/programa/:programa
+// @access  Private (Admin, Instructor)
+// v1.5
+const getAlumnosByPrograma = async (req, res) => {
+  try {
+    const { programa } = req.params;
+    const { sucursal, page = 1, limit = 10, status } = req.query;
+
+    const programasValidos = [
+      'tae-kwon-do', 'tang-soo-do', 'hapkido', 'gumdo', 'pequenos-dragones'
+    ];
+
+    if (!programasValidos.includes(programa)) {
+      return res.status(400).json({
+        success: false,
+        message: `Programa inválido. Valores permitidos: ${programasValidos.join(', ')}`
+      });
+    }
+
+    const filters = {
+      'enrollment.programa': programa,
+      isActive: true
+    };
+
+    if (sucursal) filters['enrollment.sucursal'] = sucursal;
+    if (status) filters['enrollment.status'] = status;
+
+    // Restricción por sucursal para instructores
+    if (req.user.role === 'instructor' && req.user.sucursal) {
+      filters['enrollment.sucursal'] = req.user.sucursal;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [alumnos, total] = await Promise.all([
+      Alumno.find(filters)
+        .populate('enrollment.sucursal', 'name address')
+        .populate('tutor', 'firstName lastName email phones.primary')
+        .populate('belt.certifiedBy', 'name')
+        .sort({ lastName: 1, firstName: 1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Alumno.countDocuments(filters)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        programa,
+        alumnos: alumnos.map(a => a.getPublicInfo()),
+        pagination: {
+          current: parseInt(page),
+          pages: Math.ceil(total / parseInt(limit)),
+          total,
+          limit: parseInt(limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo alumnos por programa:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
 module.exports = {
   getAlumnos,
   getAlumnoById,
@@ -930,5 +1041,6 @@ module.exports = {
   deleteAlumno,
   uploadPhoto,
   updateBelt,
-  getAlumnosStats
-};
+  getAlumnosStats,
+  getAlumnosByPrograma   // v1.5
+};;

@@ -12,7 +12,8 @@ const {
   deleteAlumno,
   uploadPhoto,
   updateBelt,
-  getAlumnosStats
+  getAlumnosStats,
+  getAlumnosByPrograma   // v1.5
 } = require('../controllers/alumnoController');
 
 // Importar middleware de autenticación
@@ -97,6 +98,17 @@ router.get('/stats',
   isInstructor, 
   logAuthRequest, 
   getAlumnosStats
+);
+
+// @route   GET /api/alumnos/programa/:programa
+// @desc    Obtener alumnos filtrados por disciplina/programa
+// @access  Private (Admin, Instructor)
+// v1.5 — NOTA: Debe ir ANTES de /:id
+router.get('/programa/:programa',
+  authenticate,
+  isInstructor,
+  logAuthRequest,
+  getAlumnosByPrograma
 );
 
 // @route   GET /api/alumnos
