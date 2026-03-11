@@ -23,17 +23,15 @@ const fileFilter = (req, file, cb) => {
     allowed.includes(file.mimetype)
         ? cb(null, true)
         : cb(new Error('Solo se permiten imágenes (JPEG, PNG, WEBP, GIF)'), false);
-    };
+};
 
-    const upload = multer({
-        storage,
-        fileFilter,
-        limits: { fileSize: 5 * 1024 * 1024 } // 5MB
-    });
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
-// ── @route  GET /api/disciplinas ──────────────────────────────────────────────
-// @desc   Obtener todas las disciplinas activas
-// @access Private
+// ── GET /api/disciplinas ──────────────────────────────────────────────────────
 const getDisciplinas = async (req, res) => {
     try {
         const disciplinas = await Disciplina.find({ isActive: true })
@@ -41,7 +39,6 @@ const getDisciplinas = async (req, res) => {
         .sort({ orden: 1, nombre: 1 })
         .lean();
 
-        // Agregar logoUrl resuelto
         const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3005}`;
         const result  = disciplinas.map(d => ({
         ...d,
@@ -53,86 +50,86 @@ const getDisciplinas = async (req, res) => {
         res.json({ success: true, data: result });
     } catch (error) {
         console.error('Error obteniendo disciplinas:', error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        res.status(500).json({ success: false, message: 'Error interno del servidor', detail: error.message });
     }
 };
 
-// ── @route  PUT /api/disciplinas/:id/logo ─────────────────────────────────────
-// @desc   Subir / actualizar logo de una disciplina
-// @access Private (Admin)
+// ── PUT /api/disciplinas/:id/logo ─────────────────────────────────────────────
+// Usa findByIdAndUpdate + runValidators:false para evitar que campos required
+// del modelo (createdBy, sucursales, etc.) bloqueen la operación.
 const updateLogo = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'No se proporcionó ninguna imagen' });
         }
 
-        const disciplina = await Disciplina.findById(req.params.id);
-        if (!disciplina) {
-            // Limpiar archivo subido si no existe la disciplina
+        const existente = await Disciplina.findById(req.params.id).select('nombre logo').lean();
+        if (!existente) {
             await fs.unlink(req.file.path).catch(() => {});
             return res.status(404).json({ success: false, message: 'Disciplina no encontrada' });
         }
 
-        // Eliminar logo anterior si existe (y no es una URL externa)
-        if (disciplina.logo?.filename) {
-            const oldPath = path.join(__dirname, '../uploads/logos', disciplina.logo.filename);
-            if (fsSync.existsSync(oldPath)) {
-                await fs.unlink(oldPath).catch(() => {});
-            }
+        // Borrar logo anterior del disco
+        if (existente.logo?.filename) {
+        const oldPath = path.join(__dirname, '../uploads/logos', existente.logo.filename);
+            if (fsSync.existsSync(oldPath)) await fs.unlink(oldPath).catch(() => {});
         }
 
-        // Guardar nuevo logo
-        disciplina.logo = {
-            url      : `/uploads/logos/${req.file.filename}`,
-            filename : req.file.filename,
+        const newLogo = {
+            url          : `/uploads/logos/${req.file.filename}`,
+            filename     : req.file.filename,
+            originalName : req.file.originalname,
+            mimetype     : req.file.mimetype,
+            size         : req.file.size,
         };
-        await disciplina.save();
+
+        // Solo actualiza el campo logo — sin disparar validación del documento completo
+        await Disciplina.findByIdAndUpdate(
+            req.params.id,
+            { $set: { logo: newLogo } },
+            { runValidators: false }
+        );
 
         const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3005}`;
         const logoUrl = `${baseUrl}/uploads/logos/${req.file.filename}`;
 
         res.json({
             success : true,
-            message : `Logo de ${disciplina.nombre} actualizado correctamente`,
-            data    : {
-                _id    : disciplina._id,
-                nombre : disciplina.nombre,
-                logo   : disciplina.logo,
-                logoUrl,
-            }
+            message : `Logo de ${existente.nombre} actualizado correctamente`,
+            data    : { _id: req.params.id, nombre: existente.nombre, logo: newLogo, logoUrl }
         });
+
     } catch (error) {
-        // Limpiar archivo si hubo error
         if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
-        console.error('Error actualizando logo de disciplina:', error);
-        res.status(500).json({ success: false, message: 'Error al actualizar el logo' });
+        console.error('Error actualizando logo:', error);
+        res.status(500).json({ success: false, message: 'Error al actualizar el logo', detail: error.message });
     }
 };
 
-// ── @route  DELETE /api/disciplinas/:id/logo ─────────────────────────────────
-// @desc   Eliminar logo de una disciplina
-// @access Private (Admin)
+// ── DELETE /api/disciplinas/:id/logo ─────────────────────────────────────────
 const deleteLogo = async (req, res) => {
     try {
-        const disciplina = await Disciplina.findById(req.params.id);
-        if (!disciplina) {
+        const existente = await Disciplina.findById(req.params.id).select('nombre logo').lean();
+        if (!existente) {
             return res.status(404).json({ success: false, message: 'Disciplina no encontrada' });
         }
 
-        if (disciplina.logo?.filename) {
-            const filePath = path.join(__dirname, '../uploads/logos', disciplina.logo.filename);
-            if (fsSync.existsSync(filePath)) {
-                await fs.unlink(filePath).catch(() => {});
-            }
+        if (existente.logo?.filename) {
+            const filePath = path.join(__dirname, '../uploads/logos', existente.logo.filename);
+            if (fsSync.existsSync(filePath)) await fs.unlink(filePath).catch(() => {});
         }
 
-        disciplina.logo = { url: null, filename: null };
-        await disciplina.save();
+        await Disciplina.findByIdAndUpdate(
+            req.params.id,
+            { $set: { logo: { url: null, filename: null, originalName: null, mimetype: null, size: null } } },
+            { runValidators: false }
+        );
 
-        res.json({ success: true, message: `Logo de ${disciplina.nombre} eliminado` });
+        res.json({ success: true, message: `Logo de ${existente.nombre} eliminado` });
+
     } catch (error) {
-        console.error('Error eliminando logo de disciplina:', error);
-        res.status(500).json({ success: false, message: 'Error al eliminar el logo' });
+        console.error('Error eliminando logo:', error);
+        res.status(500).json({ success: false, message: 'Error al eliminar el logo', detail: error.message });
     }
 };
 
