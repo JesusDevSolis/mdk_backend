@@ -20,13 +20,13 @@ const LOGOS_DIR = path.join(__dirname, '../uploads/logos');
 
 // ─── Paleta institucional ────────────────────────────────────────────────────
 const C = {
-    navy  : '#1e3a5f',
-    red   : '#c8102e',
+    navy  : '#2d3748',   // Gris carbón oscuro — headers y secciones
+    red   : '#718096',   // Gris medio — acentos (banda programa, separadores)
     gold  : '#c8971e',
-    light : '#f2f5f8',
-    border: '#b0bcc8',
-    text  : '#111827',
-    muted : '#4b5563',
+    light : '#f7f8fa',   // Fondo secciones casi blanco
+    border: '#d1d9e0',   // Borde muy sutil
+    text  : '#1a202c',   // Texto principal casi negro
+    muted : '#718096',   // Etiquetas gris medio
     white : '#ffffff',
 };
 
@@ -37,10 +37,10 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 
 // ─── Configuración por programa ──────────────────────────────────────────────
 const PROG = {
-    'tae-kwon-do'      : { label: 'TAE KWON DO',      logo: 'logo-mdk.jpg',               esDragon: false },
-    'tang-soo-do'      : { label: 'TANG SOO DO',       logo: 'logo-mdk.jpg',               esDragon: false },
-    'hapkido'          : { label: 'HAPKIDO',           logo: 'logo-mdk.jpg',               esDragon: false },
-    'gumdo'            : { label: 'GUMDO',             logo: 'logo-mdk.jpg',               esDragon: false },
+    'tae-kwon-do'      : { label: 'TAE KWON DO',      logo: 'logo-mdk.png',               esDragon: false },
+    'tang-soo-do'      : { label: 'TANG SOO DO',       logo: 'logo-mdk.png',               esDragon: false },
+    'hapkido'          : { label: 'HAPKIDO',           logo: 'logo-mdk.png',               esDragon: false },
+    'gumdo'            : { label: 'GUMDO',             logo: 'logo-mdk.png',               esDragon: false },
     'pequenos-dragones': { label: 'PEQUEÑOS DRAGONES', logo: 'logo-pequenos-dragones.png', esDragon: true  },
 };
 
@@ -200,7 +200,7 @@ const buildPage1 = (doc, alumno, config, studentId) => {
     })();
 
     // ── ENCABEZADO ───────────────────────────────────────────────────────────────
-    doc.rect(0, 0, PAGE_W, 90).fill(C.navy);
+    doc.rect(0, 0, PAGE_W, 90).fill('#2d3748');   // Gris carbón oscuro — profesional
 
     // Logo
     drawLogoSafe(doc, config.logo, MARGIN - 4, 6, 76, 76);
@@ -214,8 +214,8 @@ const buildPage1 = (doc, alumno, config, studentId) => {
     doc.fontSize(14).fillColor(C.white).font('Helvetica-Bold')
         .text('SOLICITUD DE INGRESO', titX, 14, { width: titW, align: 'center', lineBreak: false });
 
-    // Banda roja con nombre del programa
-    doc.rect(titX, 36, titW, 17).fill(C.red);
+    // Banda programa gris medio
+    doc.rect(titX, 36, titW, 17).fill('#4a5568');
     doc.fontSize(9).fillColor(C.white).font('Helvetica-Bold')
         .text(config.label, titX, 40, { width: titW, align: 'center', lineBreak: false });
 
@@ -388,18 +388,18 @@ const buildPage1 = (doc, alumno, config, studentId) => {
 
     doc.fontSize(6.2).fillColor(C.muted).font('Helvetica')
         .text(COMPROMISO, MARGIN, y, { width: CONTENT_W, align: 'center', lineBreak: false });
-    y += 12;
+    y += 28;
 
     doc.fontSize(7).fillColor(C.navy).font('Helvetica-Bold')
         .text('www.ambedolla.com', MARGIN, y, { width: CONTENT_W, align: 'center', lineBreak: false });
-};
+    };
 
-// ─── PÁGINA 2: REGLAMENTO ────────────────────────────────────────────────────
-const buildPage2 = (doc, config) => {
+    // ─── PÁGINA 2: REGLAMENTO ────────────────────────────────────────────────────
+    const buildPage2 = (doc, config) => {
     const esDragon = config.esDragon;
 
     // ── ENCABEZADO ──────────────────────────────────────────────────────────────
-    drawLogoSafe(doc, 'logo-mdk.jpg', MARGIN - 4, 10, 60, 60);
+    drawLogoSafe(doc, 'logo-mdk.png', MARGIN - 4, 10, 60, 60);
 
     const cx2 = MARGIN + 64;
     const cw2 = CONTENT_W - 64;
@@ -420,6 +420,7 @@ const buildPage2 = (doc, config) => {
 
     // ── REGLAMENTO INTERNO ──────────────────────────────────────────────────────
     y2 = tituloConLineas(doc, 'REGLAMENTO INTERNO', y2);
+    y2 += 12;
 
     REGLAMENTO.forEach((regla, i) => {
         const txt  = `${i + 1}.- ${regla}`;
@@ -429,10 +430,11 @@ const buildPage2 = (doc, config) => {
         y2 += h + 1.5;
     });
 
-    y2 += 6;
+    y2 += 10;
 
     // ── CÓDIGO DE CONDUCTA ──────────────────────────────────────────────────────
     y2 = tituloConLineas(doc, 'CÓDIGO DE CONDUCTA', y2);
+    y2 += 12;
 
     CODIGO.forEach((regla, i) => {
         const txt  = `${i + 1}.- ${regla}`;
@@ -463,23 +465,24 @@ const buildPage2 = (doc, config) => {
 
     // ── FRASE ────────────────────────────────────────────────────────────────────
     doc.rect(MARGIN, y2, CONTENT_W, 0.5).fill(C.border);
-    y2 += 6;
+    y2 += 10;
     doc.fontSize(7.5).fillColor(C.navy).font('Helvetica-Bold')
         .text(FRASE_FINAL, MARGIN, y2, { width: CONTENT_W, align: 'center', lineBreak: false });
-    y2 += 16;
+    y2 += 22;
 
+    y2 += 12;
     // ── Logo Bedolla ─────────────────────────────────────────────────────────────
     drawLogoSafe(doc, 'logo-bedolla.png', (PAGE_W - 130) / 2, y2, 130, 32);
-};
+    };
 
-// ─── FUNCIÓN PRINCIPAL ────────────────────────────────────────────────────────
-/**
- * Genera el PDF oficial de Solicitud de Ingreso
- * @param {Object} alumno  - Documento del alumno con populate de sucursal y tutor
- * @param {string} destDir - Ruta absoluta del directorio destino
- * @returns {Promise<{ filePath, fileName, url }>}
- */
-const generateSolicitudIngreso = (alumno, destDir) => {
+    // ─── FUNCIÓN PRINCIPAL ────────────────────────────────────────────────────────
+    /**
+     * Genera el PDF oficial de Solicitud de Ingreso
+     * @param {Object} alumno  - Documento del alumno con populate de sucursal y tutor
+     * @param {string} destDir - Ruta absoluta del directorio destino
+     * @returns {Promise<{ filePath, fileName, url }>}
+     */
+    const generateSolicitudIngreso = (alumno, destDir) => {
     return new Promise((resolve, reject) => {
         try {
         if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
