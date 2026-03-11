@@ -481,6 +481,7 @@ const updateAlumno = async (req, res) => {
     const {
       firstName,
       lastName,
+      secondLastName,
       dateOfBirth,
       gender,
       // v1.5 — campos del formulario físico
@@ -575,6 +576,7 @@ const updateAlumno = async (req, res) => {
     const updateData = {};
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
+    if (secondLastName !== undefined) updateData.secondLastName = secondLastName;
     if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
     if (gender !== undefined) updateData.gender = gender;
     // v1.5
