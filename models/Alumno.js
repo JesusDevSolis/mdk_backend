@@ -16,6 +16,13 @@ const alumnoSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Los apellidos no pueden exceder 50 caracteres']
   },
+  // v1.5 — Apellido Materno separado para formulario oficial
+  secondLastName: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'El apellido materno no puede exceder 50 caracteres'],
+    default: ''
+  },
   dateOfBirth: {
     type: Date,
     required: [true, 'La fecha de nacimiento es requerida'],
@@ -322,6 +329,13 @@ const alumnoSchema = new mongoose.Schema({
       type: String,
       trim: true,
       maxlength: [100, 'El campo "recomendado por" no puede exceder 100 caracteres']
+    },
+    // v1.5 — Observaciones para el formulario oficial
+    observaciones: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Las observaciones no pueden exceder 500 caracteres'],
+      default: ''
     }
   },
 
@@ -485,6 +499,7 @@ alumnoSchema.methods.getPublicInfo = function() {
     fullName: this.fullName,
     firstName: this.firstName,
     lastName: this.lastName,
+    secondLastName: this.secondLastName,  // v1.5
     age: this.age,
     isMinor: this.isMinor,
     dateOfBirth: this.dateOfBirth,
