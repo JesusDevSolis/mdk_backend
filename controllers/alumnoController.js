@@ -4,6 +4,10 @@ const Sucursal = require('../models/Sucursal');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
+
+// ── v1.5: Servicio de generación de PDF ──────────────────────────────────────
+const { generateSolicitudIngreso } = require('../services/pdfService');
 
 // @desc    Obtener todos los alumnos
 // @route   GET /api/alumnos
@@ -428,6 +432,11 @@ const createAlumno = async (req, res) => {
 
     // Actualizar estadísticas de la sucursal
     await updateSucursalStats(enrollment.sucursal);
+
+    // v1.5 — Generar PDF de Solicitud de Ingreso en background (no bloquea la respuesta)
+    const alumnoId = alumno._id;
+    const userId   = req.user?._id;
+    setImmediate(() => _generarPDFPostCreacion(alumnoId, userId));
 
     res.status(201).json({
       success: true,
@@ -1033,6 +1042,80 @@ const getAlumnosByPrograma = async (req, res) => {
   }
 };
 
+// ── v1.5: Generar PDF de Solicitud de Ingreso ─────────────────────────────────
+// @route  GET /api/alumnos/:id/solicitud-pdf
+// @access Private (Admin, Instructor)
+const getSolicitudPDF = async (req, res) => {
+  try {
+    const alumno = await Alumno.findById(req.params.id)
+      .populate('enrollment.sucursal', 'name address phone')
+      .populate('tutor', 'firstName lastName phones email occupation')
+      .populate('belt.certifiedBy', 'name')
+      .lean();
+
+    if (!alumno) {
+      return res.status(404).json({ success: false, message: 'Alumno no encontrado' });
+    }
+
+    const destDir = path.join(__dirname, '../uploads/solicitudes');
+    const { filePath, fileName, url } = await generateSolicitudIngreso(alumno, destDir);
+
+    // Guardar referencia en MongoDB
+    await Alumno.findByIdAndUpdate(req.params.id, {
+      solicitudPdf: {
+        fileName,
+        filePath,
+        url,
+        generatedAt: new Date(),
+        generatedBy: req.user?._id
+      }
+    });
+
+    // Servir el PDF directamente al cliente
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.sendFile(filePath);
+
+  } catch (error) {
+    console.error('❌ Error generando PDF de solicitud:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar el PDF de solicitud',
+      error: error.message
+    });
+  }
+};
+
+// ── v1.5: Generar PDF automáticamente al crear alumno (background) ────────────
+const _generarPDFPostCreacion = async (alumnoId, userId) => {
+  try {
+    const alumno = await Alumno.findById(alumnoId)
+      .populate('enrollment.sucursal', 'name address phone')
+      .populate('tutor', 'firstName lastName phones email occupation')
+      .lean();
+
+    if (!alumno) return;
+
+    const destDir = path.join(__dirname, '../uploads/solicitudes');
+    const { filePath, fileName, url } = await generateSolicitudIngreso(alumno, destDir);
+
+    await Alumno.findByIdAndUpdate(alumnoId, {
+      solicitudPdf: {
+        fileName,
+        filePath,
+        url,
+        generatedAt: new Date(),
+        generatedBy: userId
+      }
+    });
+
+    console.log(`📄 PDF generado automáticamente: ${fileName}`);
+  } catch (err) {
+    // No interrumpir el flujo principal si el PDF falla
+    console.error('⚠️  Error generando PDF automático (no crítico):', err.message);
+  }
+};
+
 module.exports = {
   getAlumnos,
   getAlumnoById,
@@ -1042,5 +1125,7 @@ module.exports = {
   uploadPhoto,
   updateBelt,
   getAlumnosStats,
-  getAlumnosByPrograma   // v1.5
-};;
+  getAlumnosByPrograma,   // v1.5
+  getSolicitudPDF,        // v1.5 PDF
+  _generarPDFPostCreacion // v1.5 PDF (interno)
+};

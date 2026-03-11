@@ -392,6 +392,18 @@ const alumnoSchema = new mongoose.Schema({
   lastModifiedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+
+  // ── v1.5: PDF Solicitud de Ingreso generado automáticamente ──────────────
+  solicitudPdf: {
+    fileName   : { type: String },
+    filePath   : { type: String },
+    url        : { type: String },
+    generatedAt: { type: Date },
+    generatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref : 'User'
+    }
   }
 
 }, {
@@ -625,7 +637,6 @@ alumnoSchema.pre('remove', async function(next) {
     next(error);
   }
 });
-
 // ─────────────────────────────────────────────
 const Alumno = mongoose.model('Alumno', alumnoSchema);
 module.exports = Alumno;

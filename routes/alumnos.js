@@ -13,7 +13,8 @@ const {
   uploadPhoto,
   updateBelt,
   getAlumnosStats,
-  getAlumnosByPrograma   // v1.5
+  getAlumnosByPrograma,   // v1.5
+  getSolicitudPDF         // v1.5 PDF
 } = require('../controllers/alumnoController');
 
 // Importar middleware de autenticación
@@ -119,6 +120,17 @@ router.get('/',
   isInstructor, 
   logAuthRequest, 
   getAlumnos
+);
+
+// @route   GET /api/alumnos/:id/solicitud-pdf
+// @desc    Generar / Descargar PDF de Solicitud de Ingreso (v1.5)
+// @access  Private (Admin, Instructor)
+router.get('/:id/solicitud-pdf',
+  authenticate,
+  isInstructor,
+  validateMongoId,
+  logAuthRequest,
+  getSolicitudPDF
 );
 
 // @route   GET /api/alumnos/:id
