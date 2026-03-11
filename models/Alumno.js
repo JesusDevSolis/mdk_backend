@@ -443,7 +443,7 @@ alumnoSchema.index({ isActive: 1 });
 // ─────────────────────────────────────────────
 
 alumnoSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`.trim();
+  return [this.firstName, this.lastName, this.secondLastName].filter(Boolean).join(' ');
 });
 
 alumnoSchema.virtual('age').get(function() {
