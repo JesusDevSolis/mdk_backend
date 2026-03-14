@@ -82,6 +82,10 @@ router.get('/pendientes', paymentController.getPendingPayments);
 // GET /api/pagos/vencidos
 router.get('/vencidos', paymentController.getOverduePayments);
 
+// Actualizar status de pagos vencidos (Paso B)
+// POST /api/pagos/actualizar-vencidos
+router.post('/actualizar-vencidos', paymentController.actualizarVencidos);
+
 // Obtener pagos por alumno
 // GET /api/pagos/alumno/:alumnoId
 router.get('/alumno/:alumnoId', paymentController.getPaymentsByAlumno);

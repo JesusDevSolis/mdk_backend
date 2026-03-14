@@ -283,6 +283,25 @@ exports.createPayment = async (req, res) => {
       createdBy: req.user._id
     };
 
+    // ── Paso B: si no viene dueDate, calcularlo desde paymentDay del alumno ──
+    if (!paymentData.dueDate && paymentData.alumno) {
+      try {
+        const alumno = await Alumno.findById(paymentData.alumno)
+          .select('enrollment.paymentDay').lean();
+        const paymentDay = alumno?.enrollment?.paymentDay;
+        if (paymentDay) {
+          const hoy  = new Date();
+          let fecha  = new Date(hoy.getFullYear(), hoy.getMonth(), paymentDay);
+          if (fecha <= hoy) {
+            fecha = new Date(hoy.getFullYear(), hoy.getMonth() + 1, paymentDay);
+          }
+          paymentData.dueDate = fecha;
+        }
+      } catch (e) {
+        console.warn('No se pudo calcular dueDate desde paymentDay:', e.message);
+      }
+    }
+
     const payment = new Payment(paymentData);
     await payment.save();
 
@@ -639,6 +658,38 @@ exports.getOverduePayments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al obtener pagos vencidos',
+      error: error.message
+    });
+  }
+};
+
+// ===== ACTUALIZAR PAGOS VENCIDOS (Paso B) =====
+// Marca como 'vencido' todos los pagos 'pendiente' cuyo dueDate ya pasó.
+// Se llama automáticamente desde PagosPage al cargar.
+exports.actualizarVencidos = async (req, res) => {
+  try {
+    const ahora = new Date();
+    ahora.setHours(0, 0, 0, 0);
+
+    const result = await Payment.updateMany(
+      {
+        status: 'pendiente',
+        dueDate: { $lt: ahora },
+        isActive: true
+      },
+      { $set: { status: 'vencido' } }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} pago(s) marcados como vencidos`,
+      data: { actualizados: result.modifiedCount }
+    });
+  } catch (error) {
+    console.error('Error actualizando vencidos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar pagos vencidos',
       error: error.message
     });
   }
