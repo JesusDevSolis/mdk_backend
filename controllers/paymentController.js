@@ -695,6 +695,219 @@ exports.actualizarVencidos = async (req, res) => {
   }
 };
 
+// ===== GENERAR MENSUALIDADES FALTANTES (Paso C) =====
+// Para un alumno dado, genera los pagos de colegiatura de todos los meses
+// desde su enrollmentDate hasta hoy que aún no tienen registro.
+exports.generarMensualidades = async (req, res) => {
+  try {
+    const { alumnoId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(alumnoId)) {
+      return res.status(400).json({ success: false, message: 'ID de alumno inválido' });
+    }
+
+    // Cargar alumno con los datos necesarios
+    const alumno = await Alumno.findById(alumnoId)
+      .select('firstName lastName enrollment tutor')
+      .lean();
+
+    if (!alumno) {
+      return res.status(404).json({ success: false, message: 'Alumno no encontrado' });
+    }
+
+    const { enrollment } = alumno;
+    const paymentDay    = enrollment?.paymentDay;
+    const monthlyFee    = enrollment?.monthlyFee;
+    const sucursalId    = enrollment?.sucursal;
+    const enrollmentDate = enrollment?.enrollmentDate
+      ? new Date(enrollment.enrollmentDate)
+      : null;
+
+    if (!paymentDay || !monthlyFee || !sucursalId || !enrollmentDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'El alumno no tiene configurados: día de pago, cuota mensual, sucursal o fecha de inscripción'
+      });
+    }
+
+    // Calcular el primer mes de cobro:
+    // Si el alumno se inscribió antes del día de pago en ese mes → cobrar ese mismo mes
+    // Si se inscribió después → empezar el mes siguiente
+    const primerMes = new Date(enrollmentDate);
+    if (enrollmentDate.getDate() >= paymentDay) {
+      primerMes.setMonth(primerMes.getMonth() + 1);
+    }
+    primerMes.setDate(1); // normalizar al día 1 para iterar meses
+
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999);
+
+    // Obtener los meses que ya tienen pago registrado para este alumno
+    const pagosExistentes = await Payment.find({
+      alumno: alumnoId,
+      type: 'colegiatura',
+      isActive: true
+    }).select('period').lean();
+
+    const mesesExistentes = new Set(
+      pagosExistentes.map(p => `${p.period?.year}-${p.period?.month}`)
+    );
+
+    // Iterar mes a mes desde primerMes hasta hoy
+    const pagosCreados = [];
+    const cursor = new Date(primerMes);
+
+    while (cursor <= hoy) {
+      const mes  = cursor.getMonth() + 1;  // 1-based
+      const año  = cursor.getFullYear();
+      const clave = `${año}-${mes}`;
+
+      if (!mesesExistentes.has(clave)) {
+        const dueDate = new Date(año, mes - 1, paymentDay);
+        const status  = dueDate < new Date() ? 'vencido' : 'pendiente';
+
+        const nuevoPago = await Payment.create({
+          alumno      : alumnoId,
+          tutor       : alumno.tutor || undefined,
+          sucursal    : sucursalId,
+          type        : 'colegiatura',
+          description : `Colegiatura ${mes}/${año}`,
+          amount      : monthlyFee,
+          discount    : 0,
+          dueDate,
+          status,
+          period      : { month: mes, year: año },
+          createdBy   : req.user._id
+        });
+
+        pagosCreados.push(nuevoPago);
+      }
+
+      // Avanzar al siguiente mes
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    // Después de crear, marcar vencidos en toda la colección
+    await Payment.updateMany(
+      { status: 'pendiente', dueDate: { $lt: new Date() }, isActive: true },
+      { $set: { status: 'vencido' } }
+    );
+
+    res.json({
+      success : true,
+      message : pagosCreados.length > 0
+        ? `${pagosCreados.length} mensualidad(es) generada(s) para ${alumno.firstName} ${alumno.lastName}`
+        : `${alumno.firstName} ${alumno.lastName} ya tiene todos los pagos al día`,
+      data    : { generados: pagosCreados.length, alumno: alumnoId }
+    });
+
+  } catch (error) {
+    console.error('Error generando mensualidades:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar mensualidades',
+      error: error.message
+    });
+  }
+};
+
+// ===== GENERAR MENSUALIDADES PARA TODOS LOS ALUMNOS ACTIVOS (Paso C - bulk) =====
+exports.generarMensualidadesBulk = async (req, res) => {
+  try {
+    const alumnos = await Alumno.find({
+      'enrollment.status': 'activo',
+      'enrollment.paymentDay': { $exists: true },
+      'enrollment.monthlyFee': { $gt: 0 }
+    }).select('firstName lastName enrollment tutor').lean();
+
+    let totalGenerados = 0;
+    const errores = [];
+
+    for (const alumno of alumnos) {
+      try {
+        const { enrollment } = alumno;
+        const paymentDay     = enrollment?.paymentDay;
+        const monthlyFee     = enrollment?.monthlyFee;
+        const sucursalId     = enrollment?.sucursal;
+        const enrollmentDate = enrollment?.enrollmentDate
+          ? new Date(enrollment.enrollmentDate)
+          : null;
+
+        if (!paymentDay || !monthlyFee || !sucursalId || !enrollmentDate) continue;
+
+        const primerMes = new Date(enrollmentDate);
+        if (enrollmentDate.getDate() >= paymentDay) {
+          primerMes.setMonth(primerMes.getMonth() + 1);
+        }
+        primerMes.setDate(1);
+
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999);
+
+        const pagosExistentes = await Payment.find({
+          alumno: alumno._id,
+          type: 'colegiatura',
+          isActive: true
+        }).select('period').lean();
+
+        const mesesExistentes = new Set(
+          pagosExistentes.map(p => `${p.period?.year}-${p.period?.month}`)
+        );
+
+        const cursor = new Date(primerMes);
+        while (cursor <= hoy) {
+          const mes   = cursor.getMonth() + 1;
+          const año   = cursor.getFullYear();
+          const clave = `${año}-${mes}`;
+
+          if (!mesesExistentes.has(clave)) {
+            const dueDate = new Date(año, mes - 1, paymentDay);
+            const status  = dueDate < new Date() ? 'vencido' : 'pendiente';
+
+            await Payment.create({
+              alumno      : alumno._id,
+              tutor       : alumno.tutor || undefined,
+              sucursal    : sucursalId,
+              type        : 'colegiatura',
+              description : `Colegiatura ${mes}/${año}`,
+              amount      : monthlyFee,
+              discount    : 0,
+              dueDate,
+              status,
+              period      : { month: mes, year: año },
+              createdBy   : req.user._id
+            });
+            totalGenerados++;
+          }
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      } catch (e) {
+        errores.push({ alumno: alumno._id, error: e.message });
+      }
+    }
+
+    // Actualizar vencidos globalmente
+    await Payment.updateMany(
+      { status: 'pendiente', dueDate: { $lt: new Date() }, isActive: true },
+      { $set: { status: 'vencido' } }
+    );
+
+    res.json({
+      success  : true,
+      message  : `${totalGenerados} mensualidad(es) generada(s) para ${alumnos.length} alumno(s) activo(s)`,
+      data     : { totalGenerados, alumnosProcesados: alumnos.length, errores }
+    });
+
+  } catch (error) {
+    console.error('Error en generarMensualidadesBulk:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar mensualidades',
+      error: error.message
+    });
+  }
+};
+
 // ===== OBTENER PAGOS POR ALUMNO =====
 exports.getPaymentsByAlumno = async (req, res) => {
   try {

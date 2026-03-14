@@ -86,6 +86,14 @@ router.get('/vencidos', paymentController.getOverduePayments);
 // POST /api/pagos/actualizar-vencidos
 router.post('/actualizar-vencidos', paymentController.actualizarVencidos);
 
+// Generar mensualidades para TODOS los alumnos activos (Paso C - bulk)
+// POST /api/pagos/generar-mensualidades
+router.post('/generar-mensualidades', paymentController.generarMensualidadesBulk);
+
+// Generar mensualidades para un alumno específico (Paso C)
+// POST /api/pagos/generar-mensualidades/:alumnoId
+router.post('/generar-mensualidades/:alumnoId', paymentController.generarMensualidades);
+
 // Obtener pagos por alumno
 // GET /api/pagos/alumno/:alumnoId
 router.get('/alumno/:alumnoId', paymentController.getPaymentsByAlumno);
