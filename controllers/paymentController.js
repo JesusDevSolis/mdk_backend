@@ -1027,6 +1027,101 @@ exports.getPaymentStats = async (req, res) => {
   }
 };
 
+// ===== COBRAR CON COMPROBANTE (modal unificado) =====
+// Hace markAsPaid + uploadReceipt en una sola operación.
+// Recibe multipart/form-data con: paymentMethod, paidDate, paymentReference,
+// notes, aplicarRecargo + archivo comprobante (campo "comprobante").
+exports.cobrarConComprobante = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentMethod, paidDate, paymentReference, notes, aplicarRecargo } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (req.file) require('fs').unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: 'ID de pago inválido' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'El comprobante de pago es obligatorio'
+      });
+    }
+
+    if (!paymentMethod) {
+      require('fs').unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: 'El método de pago es requerido' });
+    }
+
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      require('fs').unlinkSync(req.file.path);
+      return res.status(404).json({ success: false, message: 'Pago no encontrado' });
+    }
+
+    if (payment.status === 'pagado') {
+      require('fs').unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: 'Este pago ya está registrado como pagado' });
+    }
+
+    // Calcular y aplicar recargo si corresponde
+    if (aplicarRecargo !== 'false' && aplicarRecargo !== false) {
+      const recargoInfo = await calcularRecargoAutomatico(payment);
+      if (recargoInfo.aplicaRecargo) {
+        payment.total    = payment.amount + recargoInfo.montoRecargo;
+        payment.lateFee  = recargoInfo.montoRecargo;
+      }
+    }
+
+    // 1 — Marcar como pagado
+    await payment.markAsPaid({
+      paidDate      : paidDate ? new Date(paidDate) : new Date(),
+      paymentMethod,
+      paymentReference : paymentReference || ''
+    }, req.user._id);
+
+    if (notes) {
+      payment.notes = notes;
+    }
+
+    // 2 — Adjuntar comprobante
+    payment.receiptFile = {
+      filename     : req.file.filename,
+      originalName : req.file.originalname,
+      mimetype     : req.file.mimetype,
+      size         : req.file.size,
+      url          : `/uploads/documents/${req.file.filename}`,
+      uploadedAt   : new Date(),
+      uploadedBy   : req.user._id
+    };
+
+    await payment.save();
+
+    const updated = await Payment.findById(payment._id)
+      .populate('alumno', 'firstName lastName secondLastName enrollment.studentId')
+      .populate('tutor',   'firstName lastName')
+      .populate('sucursal','name')
+      .populate('paidBy',  'name');
+
+    res.status(200).json({
+      success : true,
+      message : 'Pago registrado con comprobante exitosamente',
+      data    : updated.getPublicInfo()
+    });
+
+  } catch (error) {
+    if (req.file?.path) {
+      try { require('fs').unlinkSync(req.file.path); } catch (_) {}
+    }
+    console.error('Error en cobrarConComprobante:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al registrar el pago',
+      error: error.message
+    });
+  }
+};
+
 // ===== SUBIR COMPROBANTE DE PAGO =====
 exports.uploadReceipt = async (req, res) => {
   try {

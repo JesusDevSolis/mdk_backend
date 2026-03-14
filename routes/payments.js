@@ -142,6 +142,15 @@ router.put('/:id/marcar-pagado', paymentController.markAsPaid);
 // Body: { reason }
 router.put('/:id/cancelar', paymentController.cancelPayment);
 
+// Cobrar + subir comprobante en un solo paso (modal unificado)
+// POST /api/pagos/:id/cobrar
+// Form-data: paymentMethod, paidDate, paymentReference, notes + comprobante (file)
+router.post(
+  '/:id/cobrar',
+  upload.single('comprobante'),
+  paymentController.cobrarConComprobante
+);
+
 // Subir comprobante de pago
 // POST /api/pagos/:id/comprobante
 // Form-data: comprobante (file)
