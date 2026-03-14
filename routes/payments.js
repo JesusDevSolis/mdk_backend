@@ -108,22 +108,26 @@ router.get('/tutor/:tutorId', paymentController.getPaymentsByTutor);
 // GET /api/pagos?page=1&limit=20&status=pendiente&type=colegiatura
 router.get('/', paymentController.getAllPayments);
 
+// ── Rutas con subruta ANTES de /:id para evitar captura prematura ────────────
+
+// Generar / descargar recibo PDF de un pago
+// GET /api/pagos/:id/recibo
+router.get('/:id/recibo', paymentController.getReciboPDF);
+
+// Calcular recargo para un pago específico
+// GET /api/pagos/:id/calcular-recargo
+router.get('/:id/calcular-recargo', paymentController.calcularRecargo);
+
 // Obtener pago por ID
 // GET /api/pagos/:id
 router.get('/:id', paymentController.getPaymentById);
 
-// ✅ NUEVO: Calcular recargo para un pago específico
-// GET /api/pagos/:id/calcular-recargo
-router.get('/:id/calcular-recargo', paymentController.calcularRecargo);
-
 // Crear nuevo pago
 // POST /api/pagos
-// Body: { alumno, sucursal, type, amount, dueDate, etc. }
 router.post('/', paymentController.createPayment);
 
 // Actualizar pago
 // PUT /api/pagos/:id
-// Body: { amount, dueDate, notes, etc. }
 router.put('/:id', paymentController.updatePayment);
 
 // Eliminar pago (soft delete)
@@ -132,14 +136,12 @@ router.delete('/:id', paymentController.deletePayment);
 
 // ===== RUTAS DE ACCIONES ESPECIALES =====
 
-// Marcar pago como pagado (✅ INTEGRADO CON RECARGO)
+// Marcar pago como pagado
 // PUT /api/pagos/:id/marcar-pagado
-// Body: { paidDate, paymentMethod, paymentReference, aplicarRecargo }
 router.put('/:id/marcar-pagado', paymentController.markAsPaid);
 
 // Cancelar pago
 // PUT /api/pagos/:id/cancelar
-// Body: { reason }
 router.put('/:id/cancelar', paymentController.cancelPayment);
 
 // Cobrar + subir comprobante en un solo paso (modal unificado)

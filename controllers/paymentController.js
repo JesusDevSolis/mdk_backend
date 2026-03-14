@@ -1,9 +1,10 @@
-const Payment = require('../models/Payments');
-const Alumno = require('../models/Alumno');
-const Tutor = require('../models/Tutor');
-const Sucursal = require('../models/Sucursal');
-const Configuracion = require('../models/Configuracion'); // ✅ NUEVO
-const mongoose = require('mongoose');
+const Payment    = require('../models/Payments');
+const Alumno     = require('../models/Alumno');
+const Tutor      = require('../models/Tutor');
+const Sucursal   = require('../models/Sucursal');
+const Configuracion = require('../models/Configuracion');
+const mongoose   = require('mongoose');
+const { generarReciboCobro } = require('../services/pdfService');
 
 // ✅ NUEVO: Función helper para obtener valores de configuración
 const getConfigValue = async (clave, valorDefecto) => {
@@ -1178,6 +1179,41 @@ exports.uploadReceipt = async (req, res) => {
       message: 'Error al subir el comprobante',
       error: error.message
     });
+  }
+};
+
+// ===== GENERAR / DESCARGAR RECIBO PDF =====
+exports.getReciboPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'ID de pago inválido' });
+    }
+
+    const pago = await Payment.findById(id)
+      .populate('alumno',  'firstName lastName secondLastName enrollment')
+      .populate('sucursal','name')
+      .populate('paidBy',  'name')
+      .lean();
+
+    if (!pago) {
+      return res.status(404).json({ success: false, message: 'Pago no encontrado' });
+    }
+
+    if (pago.status !== 'pagado') {
+      return res.status(400).json({ success: false, message: 'Solo se puede generar recibo de pagos completados' });
+    }
+
+    const { filePath, fileName } = await generarReciboCobro(pago);
+
+    res.setHeader('Content-Type',        'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    require('fs').createReadStream(filePath).pipe(res);
+
+  } catch (error) {
+    console.error('Error generando recibo PDF:', error);
+    res.status(500).json({ success: false, message: 'Error al generar el recibo', error: error.message });
   }
 };
 

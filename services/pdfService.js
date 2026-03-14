@@ -526,4 +526,206 @@ const buildPage1 = (doc, alumno, config, studentId) => {
     });
 };
 
-module.exports = { generateSolicitudIngreso };
+// ─────────────────────────────────────────────────────────────────────────────
+// RECIBO DE COBRO
+// Genera un recibo de pago estilo tarjeta, similar al formato Bedolla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MESES_RECIBO = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const METODOS_LABEL = {
+    efectivo      : 'Efectivo',
+    transferencia : 'Transferencia',
+    tarjeta       : 'Tarjeta',
+    deposito      : 'Depósito',
+    cheque        : 'Cheque',
+};
+
+/**
+ * @param {Object} pago       — documento Payment populado
+ * @param {String} outputDir  — carpeta donde guardar (default uploads/recibos)
+ * @returns {Promise<{filePath, fileName, url}>}
+ */
+const generarReciboCobro = (pago, outputDir) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const dir = outputDir || path.join(__dirname, '../uploads/recibos');
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+            // ── datos base ──
+            const alumno   = pago.alumno   || {};
+            const sucursal = pago.sucursal || {};
+            const paidBy   = pago.paidBy   || {};
+
+            const nombreAlumno = [alumno.firstName, alumno.lastName, alumno.secondLastName]
+                .filter(Boolean).join(' ').toUpperCase() || 'ALUMNO';
+
+            const folio   = pago.receiptNumber || pago._id?.toString().slice(-6).toUpperCase() || '------';
+            const monto   = (pago.total || pago.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+            const metodo  = METODOS_LABEL[pago.paymentMethod] || pago.paymentMethod || '-';
+            const recibio = paidBy.name || sucursal.name || 'Escuela Bedolla';
+
+            const fechaPago = pago.paidDate
+                ? new Date(pago.paidDate).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : '-';
+
+            // Periodo cubierto
+            let mesCubierto   = '-';
+            let motivoPago    = pago.description || 'Mensualidad';
+            let proximoPago   = '-';
+
+            if (pago.period?.month && pago.period?.year) {
+                const m   = pago.period.month;
+                const y   = pago.period.year;
+                const mes = MESES_RECIBO[m];
+                mesCubierto = `${mes} ${y}`;
+
+                // Motivo: desde el día de pago del alumno
+                const paymentDay = alumno.enrollment?.paymentDay || 1;
+                const desdeFecha = new Date(y, m - 2, paymentDay); // mes anterior
+                const hastaFecha = new Date(y, m - 1, paymentDay); // este mes
+                motivoPago = `Mensualidad del ${desdeFecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })} al ${hastaFecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+                // Próximo pago
+                const nextDate = new Date(y, m, paymentDay); // mes siguiente
+                proximoPago = nextDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+            }
+
+            // ── archivo ──
+            const fileName = `recibo-${folio}-${Date.now()}.pdf`;
+            const filePath = path.join(dir, fileName);
+            const stream   = fs.createWriteStream(filePath);
+
+            // ── layout tarjeta: 320 x 500 pt ──
+            const W = 320, H = 520;
+            const doc = new PDFDocument({
+                autoFirstPage : true,
+                size          : [W, H],
+                margins       : { top: 0, bottom: 0, left: 0, right: 0 },
+            });
+            doc.pipe(stream);
+
+            // ─── HEADER: banda roja + fondo blanco para el logo ──────────
+            const ROJO = '#C0102A';
+            // Banda roja superior
+            doc.rect(0, 0, W, 12).fill(ROJO);
+            // Fondo blanco para el logo
+            doc.rect(0, 12, W, 52).fill('#ffffff');
+            // Banda roja inferior
+            doc.rect(0, 64, W, 8).fill(ROJO);
+
+            // Logo Bedolla (si existe)
+            const logoBedolla = path.join(LOGOS_DIR, 'logo-bedolla.png');
+            if (fs.existsSync(logoBedolla)) {
+                try { doc.image(logoBedolla, W / 2 - 65, 14, { width: 130, height: 48 }); } catch (_) {}
+            } else {
+                // Fallback texto rojo sobre fondo blanco
+                doc.fillColor(ROJO).font('Helvetica-Bold').fontSize(20)
+                   .text('BEDOLLA', 0, 20, { align: 'center', width: W });
+                doc.fontSize(9).font('Helvetica').fillColor('#555555')
+                   .text('MARTIAL ARTS', 0, 46, { align: 'center', width: W });
+            }
+
+            // ─── SALUDO ──────────────────────────────────────────────────
+            let y = 82;
+            doc.fillColor('#1a202c').font('Helvetica').fontSize(11)
+               .text('Hola,', 28, y);
+            y += 18;
+            doc.font('Helvetica-Bold').fontSize(11)
+               .text(nombreAlumno, 28, y, { width: W - 56 });
+            y += 22;
+            doc.font('Helvetica').fontSize(9).fillColor('#555555')
+               .text('Le compartimos los detalles de su recibo de pago:', 28, y, { width: W - 56 });
+            y += 18;
+
+            // ─── TABLA RECIBO ─────────────────────────────────────────────
+            const rows = [
+                { label: 'Folio',          value: folio,        color: '#1a202c' },
+                { label: 'Fecha de pago',  value: fechaPago,    color: '#1a202c' },
+                { label: 'Importe',        value: `$${monto}`,  color: '#16a34a' },  // verde
+                { label: 'Forma de Pago',  value: metodo,       color: '#c0102a' },  // rojo
+                { label: 'Recibió',        value: recibio,      color: '#1a202c' },
+                { label: 'Motivo de pago', value: motivoPago,   color: '#c0102a', multiline: true },
+                { label: 'Mes cubierto',   value: mesCubierto,  color: '#16a34a' },
+                { label: 'Próximo pago',   value: proximoPago,  color: '#1a202c' },
+            ];
+
+            const ROW_H    = 26;
+            const LABEL_W  = 110;
+            const BORDER   = '#e2e8f0';
+            const BG_ALT   = '#f8fafc';
+
+            // Marco de la tabla
+            const tableTop = y;
+            const tableW   = W - 56;
+
+            rows.forEach((row, i) => {
+                const rowY    = y;
+                const isAlt   = i % 2 === 1;
+                const rowH    = row.multiline ? ROW_H + 12 : ROW_H;
+
+                // Fondo alterno
+                if (isAlt) {
+                    doc.rect(28, rowY, tableW, rowH).fill(BG_ALT);
+                }
+                // Separador
+                doc.moveTo(28, rowY).lineTo(28 + tableW, rowY)
+                   .strokeColor(BORDER).lineWidth(0.5).stroke();
+
+                // Etiqueta
+                doc.font('Helvetica').fontSize(8.5).fillColor('#64748b')
+                   .text(row.label, 32, rowY + 8, { width: LABEL_W - 4 });
+
+                // Valor
+                if (row.multiline) {
+                    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(row.color)
+                       .text(row.value, 32 + LABEL_W, rowY + 6, {
+                           width: tableW - LABEL_W - 4,
+                           lineGap: 2
+                       });
+                } else {
+                    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(row.color)
+                       .text(row.value, 32 + LABEL_W, rowY + 8, {
+                           width: tableW - LABEL_W - 4,
+                           align: 'right'
+                       });
+                }
+
+                y += rowH;
+            });
+
+            // Borde inferior tabla
+            doc.moveTo(28, y).lineTo(28 + tableW, y)
+               .strokeColor(BORDER).lineWidth(0.5).stroke();
+
+            // Borde exterior tabla
+            doc.rect(28, tableTop, tableW, y - tableTop)
+               .strokeColor(BORDER).lineWidth(0.8).stroke();
+
+            // ─── GRACIAS ─────────────────────────────────────────────────
+            y += 18;
+            doc.font('Helvetica-Bold').fontSize(18).fillColor('#16a34a')
+               .text('¡Gracias!', 0, y, { align: 'center', width: W });
+
+            // ─── PIE ─────────────────────────────────────────────────────
+            y += 26;
+            doc.font('Helvetica').fontSize(7).fillColor('#94a3b8')
+               .text(`Escuela de Artes Marciales Koreanas "Bedolla" • ${sucursal.name || 'San Cristóbal de las Casas'}`,
+                     0, y, { align: 'center', width: W });
+
+            doc.end();
+            stream.on('finish', () => resolve({
+                filePath,
+                fileName,
+                url: `/uploads/recibos/${fileName}`
+            }));
+            stream.on('error', reject);
+
+        } catch (err) {
+            reject(err);
+        }
+    });
+};
+
+module.exports = { generateSolicitudIngreso, generarReciboCobro };
