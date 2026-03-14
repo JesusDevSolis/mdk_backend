@@ -215,15 +215,17 @@ const createTutor = async (req, res) => {
       });
     }
 
-    // Verificar que el número de identificación no exista
-    const existingIdentification = await Tutor.findOne({ 
-      'identification.number': identification.number 
-    });
-    if (existingIdentification) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya existe un tutor con este número de identificación'
+    // Verificar que el número de identificación no exista (solo si se proporcionó)
+    if (identification?.number) {
+      const existingIdentification = await Tutor.findOne({ 
+        'identification.number': identification.number 
       });
+      if (existingIdentification) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ya existe un tutor con este número de identificación'
+        });
+      }
     }
 
     // Crear tutor

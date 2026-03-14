@@ -37,13 +37,12 @@ const tutorSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['ine', 'pasaporte', 'licencia', 'otro'],
-      required: [true, 'El tipo de identificación es requerido']
+      default: 'ine'
     },
     number: {
       type: String,
-      required: [true, 'El número de identificación es requerido'],
       trim: true,
-      unique: true,
+      sparse: true,          // permite múltiples documentos sin número (null/undefined)
       maxlength: [20, 'El número de identificación no puede exceder 20 caracteres']
     }
   },
@@ -83,7 +82,6 @@ const tutorSchema = new mongoose.Schema({
   address: {
     street: {
       type: String,
-      required: [true, 'La calle es requerida'],
       trim: true,
       maxlength: [100, 'La calle no puede exceder 100 caracteres']
     },
@@ -94,25 +92,21 @@ const tutorSchema = new mongoose.Schema({
     },
     neighborhood: {
       type: String,
-      required: [true, 'La colonia es requerida'],
       trim: true,
       maxlength: [50, 'La colonia no puede exceder 50 caracteres']
     },
     city: {
       type: String,
-      required: [true, 'La ciudad es requerida'],
       trim: true,
       maxlength: [50, 'La ciudad no puede exceder 50 caracteres']
     },
     state: {
       type: String,
-      required: [true, 'El estado es requerido'],
       trim: true,
       maxlength: [50, 'El estado no puede exceder 50 caracteres']
     },
     zipCode: {
       type: String,
-      required: [true, 'El código postal es requerido'],
       trim: true,
       maxlength: [10, 'El código postal no puede exceder 10 caracteres']
     },

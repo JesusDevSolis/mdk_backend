@@ -281,6 +281,12 @@ const alumnoSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
+    // Día del mes en que se cobra la mensualidad (15 ó 30 típicamente)
+    paymentDay: {
+      type: Number,
+      enum: [1, 5, 10, 15, 20, 25, 30],
+      default: 15
+    },
     studentId: {
       type: String,
       unique: true,
@@ -302,10 +308,9 @@ const alumnoSchema = new mongoose.Schema({
       default: 0
     },
 
-    // ── v1.5: Programa/Disciplina (PDF Solicitud de Ingreso)
-    // En Paso 1B se creará el modelo Disciplina y se podrá referenciar
+    // ── v1.5: Programa/Disciplina — múltiple selección
     programa: {
-      type: String,
+      type: [String],
       enum: [
         'tae-kwon-do',
         'tang-soo-do',
@@ -313,8 +318,11 @@ const alumnoSchema = new mongoose.Schema({
         'gumdo',
         'pequenos-dragones'
       ],
-      default: 'tae-kwon-do',
-      required: [true, 'El programa/disciplina es requerido']
+      default: ['tae-kwon-do'],
+      validate: {
+        validator: v => Array.isArray(v) && v.length >= 1,
+        message: 'Debe seleccionar al menos un programa/disciplina'
+      }
     },
 
     // ── v1.5: Motivo de inscripción (PDF Solicitud de Ingreso)

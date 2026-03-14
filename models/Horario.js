@@ -81,7 +81,17 @@ const horarioSchema = new mongoose.Schema({
     },
     categoria: {
         type: String,
-        enum: ['poomsae', 'combate', 'defensa_personal', 'acrobacia', 'general'],
+        enum: [
+          'pequenos-dragones',
+          'principiantes',
+          'intermedio',
+          'avanzado',
+          'poomsae',
+          'combate',
+          'defensa_personal',
+          'acrobacia',
+          'general'
+        ],
         default: 'general'
     },
 
@@ -599,4 +609,4 @@ horarioSchema.post('save', async function(doc) {
 // ===== EXPORTAR MODELO =====
 const Horario = mongoose.model('Horario', horarioSchema);
 
-module.exports = Horario;2
+module.exports = Horario;
