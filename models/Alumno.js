@@ -628,15 +628,20 @@ alumnoSchema.pre('save', async function(next) {
   if (this.isNew && !this.enrollment.studentId) {
     try {
       const sucursal = await mongoose.model('Sucursal').findById(this.enrollment.sucursal);
-      const year = new Date().getFullYear();
-      const count = await this.constructor.countDocuments({
+      const year     = new Date().getFullYear();
+
+      // Usar count + timestamp para evitar colisiones por intentos fallidos previos
+      const count    = await this.constructor.countDocuments({
         'enrollment.sucursal': this.enrollment.sucursal
       }) + 1;
+      const suffix   = Date.now().toString().slice(-4); // últimos 4 dígitos del timestamp
 
       const sucursalCode = sucursal
         ? sucursal.name.substring(0, 3).toUpperCase()
         : 'MDK';
-      this.enrollment.studentId = `${sucursalCode}-${year}-${count.toString().padStart(4, '0')}`;
+
+      // Formato: SBC-2026-0001-3842  (code-year-count-timestamp)
+      this.enrollment.studentId = `${sucursalCode}-${year}-${count.toString().padStart(4, '0')}-${suffix}`;
     } catch (error) {
       console.error('Error generando studentId:', error);
     }

@@ -408,8 +408,8 @@ const createAlumno = async (req, res) => {
       maritalStatus,
       occupation,
       gradeLevel,
-      // ──────────────
-      email: emailNormalizado,
+      // email solo si tiene valor — nunca guardar "" ni undefined en el índice
+      ...(emailNormalizado ? { email: emailNormalizado } : {}),
       phone,
       address,
       tutor,
@@ -464,9 +464,14 @@ const createAlumno = async (req, res) => {
     }
 
     if (error.code === 11000) {
+      const campo = Object.keys(error.keyPattern || {})[0] || 'campo';
+      const mensajes = {
+        email: 'Ya existe un alumno con este email',
+        'enrollment.studentId': 'Error generando ID de estudiante, intente de nuevo'
+      };
       return res.status(400).json({
         success: false,
-        message: 'El email ya existe'
+        message: mensajes[campo] || `Valor duplicado en: ${campo}`
       });
     }
 
@@ -596,7 +601,13 @@ const updateAlumno = async (req, res) => {
     if (occupation !== undefined) updateData.occupation = occupation;
     if (gradeLevel !== undefined) updateData.gradeLevel = gradeLevel;
     // ──────────────
-    if (email !== undefined) updateData.email = emailNormalizado;
+    if (email !== undefined) {
+      if (emailNormalizado) {
+        updateData.email = emailNormalizado
+      } else {
+        updateData.$unset = { email: 1 }  // eliminar el campo si viene vacío
+      }
+    }
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
     if (tutor !== undefined) updateData.tutor = tutor;
