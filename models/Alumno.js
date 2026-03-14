@@ -88,7 +88,8 @@ const alumnoSchema = new mongoose.Schema({
       'Email inválido'
     ],
     unique: true,
-    sparse: true // Permite nulls pero mantiene unicidad cuando existe
+    sparse: true, // Permite múltiples nulls/undefined pero unicidad cuando existe
+    set: v => (v === '' || v === null) ? undefined : v  // "" → undefined para respetar sparse
   },
   phone: {
     type: String,
