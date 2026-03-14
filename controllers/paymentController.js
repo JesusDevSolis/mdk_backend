@@ -185,10 +185,55 @@ exports.getAllPayments = async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Ordenamiento: primero por prioridad de status (vencido > pendiente > pagado > cancelado)
+    // luego por el criterio del usuario
+    const statusPriority = { vencido: 0, pendiente: 1, pagado: 2, cancelado: 3 };
+
+    // Si no hay filtro de status específico, ordenar por prioridad
+    let payments;
+    if (!status) {
+      // Traer todos y ordenar en memoria por prioridad + dueDate
+      const allPayments = await Payment.find(filters)
+        .populate('alumno', 'firstName lastName enrollment.studentId email phone')
+        .populate('tutor', 'firstName lastName email phones.primary')
+        .populate('sucursal', 'name address.city')
+        .populate('createdBy', 'name email')
+        .populate('paidBy', 'name')
+        .sort({ dueDate: 1 });
+
+      allPayments.sort((a, b) => {
+        const pa = statusPriority[a.status] ?? 99;
+        const pb = statusPriority[b.status] ?? 99;
+        if (pa !== pb) return pa - pb;
+        // Mismo status → más antiguo primero (más urgente)
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      });
+
+      const total = allPayments.length;
+      const totalPages = Math.ceil(total / parseInt(limit));
+      const paginated = allPayments.slice(skip, skip + parseInt(limit));
+
+      return res.status(200).json({
+        success: true,
+        data: paginated.map(p => p.getPublicInfo()),
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages,
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1
+        }
+      });
+    }
+
+    // Con filtro de status específico — usar sort normal
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    if (sortBy !== 'dueDate') sort.dueDate = 1;
 
-    const payments = await Payment.find(filters)
+    payments = await Payment.find(filters)
       .populate('alumno', 'firstName lastName enrollment.studentId email phone')
       .populate('tutor', 'firstName lastName email phones.primary')
       .populate('sucursal', 'name address.city')
