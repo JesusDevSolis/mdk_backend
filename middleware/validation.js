@@ -254,57 +254,48 @@ const validateTutor = [
     .normalizeEmail(),
 
   body('identification.type')
-    .notEmpty()
-    .withMessage('El tipo de identificación es requerido')
+    .optional()
     .isIn(['ine', 'cedula', 'pasaporte', 'licencia', 'otro'])
     .withMessage('Tipo de identificación inválido'),
 
   body('identification.number')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('El número de identificación es requerido')
     .isLength({ min: 5, max: 20 })
     .withMessage('El número de identificación debe tener entre 5 y 20 caracteres'),
 
   body('phones.primary')
     .trim()
     .notEmpty()
-    .withMessage('El teléfono principal es requerido')
-    .isMobilePhone('es-MX')
-    .withMessage('El teléfono principal debe tener un formato válido'),
+    .withMessage('El teléfono principal es requerido'),
 
   body('address.street')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('La calle es requerida')
     .isLength({ max: 100 })
     .withMessage('La calle no puede exceder 100 caracteres'),
 
   body('address.neighborhood')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('La colonia es requerida')
     .isLength({ max: 50 })
     .withMessage('La colonia no puede exceder 50 caracteres'),
 
   body('address.city')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('La ciudad es requerida')
     .isLength({ max: 50 })
     .withMessage('La ciudad no puede exceder 50 caracteres'),
 
   body('address.state')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('El estado es requerido')
     .isLength({ max: 50 })
     .withMessage('El estado no puede exceder 50 caracteres'),
 
   body('address.zipCode')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('El código postal es requerido')
     .isLength({ min: 5, max: 10 })
     .withMessage('El código postal debe tener entre 5 y 10 caracteres'),
 
@@ -482,8 +473,13 @@ const validateAlumno = [
   body('enrollment.programa')
     .notEmpty()
     .withMessage('El programa/disciplina es requerido')
-    .isIn(['tae-kwon-do', 'tang-soo-do', 'hapkido', 'gumdo', 'pequenos-dragones'])
-    .withMessage('Programa inválido. Valores: tae-kwon-do, tang-soo-do, hapkido, gumdo, pequenos-dragones'),
+    .custom(value => {
+      const valid = ['tae-kwon-do', 'tang-soo-do', 'hapkido', 'gumdo', 'pequenos-dragones'];
+      const arr = Array.isArray(value) ? value : [value];
+      if (arr.length === 0) throw new Error('Selecciona al menos una disciplina');
+      if (!arr.every(v => valid.includes(v))) throw new Error('Programa inválido');
+      return true;
+    }),
 
   body('enrollment.enrollmentReason')
     .optional()
