@@ -270,31 +270,31 @@ const validateTutor = [
     .withMessage('El teléfono principal es requerido'),
 
   body('address.street')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 100 })
     .withMessage('La calle no puede exceder 100 caracteres'),
 
   body('address.neighborhood')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 50 })
     .withMessage('La colonia no puede exceder 50 caracteres'),
 
   body('address.city')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 50 })
     .withMessage('La ciudad no puede exceder 50 caracteres'),
 
   body('address.state')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 50 })
     .withMessage('El estado no puede exceder 50 caracteres'),
 
   body('address.zipCode')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ min: 5, max: 10 })
     .withMessage('El código postal debe tener entre 5 y 10 caracteres'),
