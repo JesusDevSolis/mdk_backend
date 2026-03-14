@@ -193,8 +193,9 @@ const alumnoSchema = new mongoose.Schema({
   medicalInfo: {
     bloodType: {
       type: String,
-      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-      trim: true
+      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', ''],
+      trim: true,
+      set: v => (v === null || v === undefined) ? '' : v
     },
     allergies: {
       type: String,
