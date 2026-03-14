@@ -315,6 +315,7 @@ const createAlumno = async (req, res) => {
     const {
       firstName,
       lastName,
+      secondLastName,
       dateOfBirth,
       gender,
       // v1.5 — campos del formulario físico
@@ -337,9 +338,12 @@ const createAlumno = async (req, res) => {
       notes
     } = req.body;
 
+    // Normalizar email — convertir string vacío a undefined para respetar índice sparse
+    const emailNormalizado = (email && email.trim() !== '') ? email.trim().toLowerCase() : undefined;
+
     // Verificar que el email no exista (si se proporciona)
-    if (email) {
-      const existingAlumno = await Alumno.findOne({ email });
+    if (emailNormalizado) {
+      const existingAlumno = await Alumno.findOne({ email: emailNormalizado });
       if (existingAlumno) {
         return res.status(400).json({
           success: false,
@@ -395,6 +399,7 @@ const createAlumno = async (req, res) => {
     const alumnoData = {
       firstName,
       lastName,
+      secondLastName,
       dateOfBirth,
       gender,
       // v1.5
@@ -404,7 +409,7 @@ const createAlumno = async (req, res) => {
       occupation,
       gradeLevel,
       // ──────────────
-      email,
+      email: emailNormalizado,
       phone,
       address,
       tutor,
@@ -524,10 +529,15 @@ const updateAlumno = async (req, res) => {
       });
     }
 
+    // Normalizar email — convertir string vacío a undefined
+    const emailNormalizado = email !== undefined
+      ? ((email && email.trim() !== '') ? email.trim().toLowerCase() : undefined)
+      : undefined;
+
     // Verificar email único si se está cambiando
-    if (email && email !== alumno.email) {
+    if (emailNormalizado && emailNormalizado !== alumno.email) {
       const existingAlumno = await Alumno.findOne({ 
-        email, 
+        email: emailNormalizado, 
         _id: { $ne: id } 
       });
       
@@ -586,7 +596,7 @@ const updateAlumno = async (req, res) => {
     if (occupation !== undefined) updateData.occupation = occupation;
     if (gradeLevel !== undefined) updateData.gradeLevel = gradeLevel;
     // ──────────────
-    if (email !== undefined) updateData.email = email;
+    if (email !== undefined) updateData.email = emailNormalizado;
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
     if (tutor !== undefined) updateData.tutor = tutor;
