@@ -43,7 +43,8 @@ const tutorSchema = new mongoose.Schema({
       type: String,
       trim: true,
       sparse: true,          // permite múltiples documentos sin número (null/undefined)
-      maxlength: [20, 'El número de identificación no puede exceder 20 caracteres']
+      maxlength: [20, 'El número de identificación no puede exceder 20 caracteres'],
+      set: v => (v === '' || v === null) ? undefined : v  // "" → undefined para respetar sparse
     }
   },
 

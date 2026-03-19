@@ -73,39 +73,42 @@ const getTutores = async (req, res) => {
     const tutores = await query;
     const total = await Tutor.countDocuments(filters);
 
-    // Si se solicita filtro por "con hijos", agregar el conteo
-    let tutoresResult = tutores;
-    if (hasChildren !== undefined) {
-      const tutoresConConteo = await Promise.all(
-        tutores.map(async (tutor) => {
-          const childrenCount = await Alumno.countDocuments({
-            tutor: tutor._id,
-            isActive: true
-          });
-          
-          const tutorObj = tutor.toObject();
-          tutorObj.childrenCount = childrenCount;
-          
-          return tutorObj;
-        })
-      );
-      
-      // Filtrar según hasChildren
-      if (hasChildren === 'true') {
-        tutoresResult = tutoresConConteo.filter(t => t.childrenCount > 0);
-      } else if (hasChildren === 'false') {
-        tutoresResult = tutoresConConteo.filter(t => t.childrenCount === 0);
-      } else {
-        tutoresResult = tutoresConConteo;
-      }
+    // ✅ Calcular childrenCount sin filtro isActive (contar todos los alumnos vinculados)
+    const tutoresConConteo = await Promise.all(
+      tutores.map(async (tutor) => {
+        const childrenCount = await Alumno.countDocuments({
+          tutor: tutor._id
+        });
+        const tutorObj = tutor.toObject();
+        tutorObj.childrenCount = childrenCount;
+        return tutorObj;
+      })
+    );
+
+    // Filtrar por hasChildren si se solicita
+    let tutoresResult = tutoresConConteo;
+    if (hasChildren === 'true') {
+      tutoresResult = tutoresConConteo.filter(t => t.childrenCount > 0);
+    } else if (hasChildren === 'false') {
+      tutoresResult = tutoresConConteo.filter(t => t.childrenCount === 0);
     }
 
-    // Convertir a datos públicos
-    const tutoresPublicos = tutoresResult.map(tutor => 
-      typeof tutor.getPublicInfo === 'function' 
-        ? tutor.getPublicInfo() 
-        : tutor
-    );
+    // Construir respuesta explícitamente para garantizar childrenCount
+    const tutoresPublicos = tutoresResult.map(tutorObj => ({
+      _id:            tutorObj._id,
+      firstName:      tutorObj.firstName,
+      lastName:       tutorObj.lastName,
+      email:          tutorObj.email,
+      phones:         tutorObj.phones,
+      identification: tutorObj.identification,
+      address:        tutorObj.address,
+      occupation:     tutorObj.occupation,
+      notes:          tutorObj.notes,
+      isActive:       tutorObj.isActive,
+      profilePhoto:   tutorObj.profilePhoto,
+      createdAt:      tutorObj.createdAt,
+      childrenCount:  tutorObj.childrenCount ?? 0   // ← garantizado
+    }))
 
     res.json({
       success: true,
@@ -265,7 +268,11 @@ const createTutor = async (req, res) => {
     console.error('Error creando tutor:', error);
     
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
+      const messages = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message,
+        value: err.value
+      }));
       return res.status(400).json({
         success: false,
         message: 'Error de validación',
@@ -274,10 +281,32 @@ const createTutor = async (req, res) => {
     }
 
     if (error.code === 11000) {
+      const campo = Object.keys(error.keyPattern || {})[0] || ''
+
+      // Si el email ya existe, devolver el tutor existente
+      if (campo === 'email') {
+        try {
+          const tutorExistente = await Tutor.findOne({ email })
+            .populate('createdBy', 'name email')
+          if (tutorExistente) {
+            return res.status(200).json({
+              success: true,
+              message: 'Tutor recuperado (el email ya estaba registrado)',
+              data: { tutor: tutorExistente.getPublicInfo() },
+              recovered: true
+            })
+          }
+        } catch (_) {}
+        return res.status(400).json({
+          success: false,
+          message: 'Ya existe un tutor con ese email. Usa "Seleccionar tutor existente" para buscarlo.'
+        })
+      }
+
       return res.status(400).json({
         success: false,
-        message: 'El email o número de identificación ya existe'
-      });
+        message: 'Ya existe un tutor con ese número de identificación.'
+      })
     }
 
     res.status(500).json({
@@ -330,7 +359,7 @@ const updateTutor = async (req, res) => {
       });
     }
 
-    // Verificar email único si se está cambiando
+    // Verificar email único si se está cambiando (excluir el propio tutor)
     if (email && email !== tutor.email) {
       const existingTutor = await Tutor.findOne({ 
         email, 
@@ -345,8 +374,8 @@ const updateTutor = async (req, res) => {
       }
     }
 
-    // Verificar identificación única si se está cambiando
-    if (identification?.number && identification.number !== tutor.identification.number) {
+    // Verificar identificación única si se está cambiando (excluir el propio tutor)
+    if (identification?.number && identification.number !== tutor.identification?.number) {
       const existingIdentification = await Tutor.findOne({ 
         'identification.number': identification.number,
         _id: { $ne: id } 
@@ -387,7 +416,7 @@ const updateTutor = async (req, res) => {
     const updatedTutor = await Tutor.findByIdAndUpdate(
       id,
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: false }
     ).populate('createdBy', 'name email')
     .populate('lastModifiedBy', 'name email');
 
@@ -604,7 +633,6 @@ const canAccessTutor = async (user, tutor) => {
   if (user.role === 'admin') return true;
   
   if (user.role === 'instructor') {
-    // Verificar si el instructor maneja alguna sucursal donde estudian hijos del tutor
     const Sucursal = require('../models/Sucursal');
     const sucursales = await Sucursal.find({ 
       manager: user._id,

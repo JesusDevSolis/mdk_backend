@@ -254,12 +254,12 @@ const validateTutor = [
     .normalizeEmail(),
 
   body('identification.type')
-    .optional()
+    .optional({ checkFalsy: true })
     .isIn(['ine', 'cedula', 'pasaporte', 'licencia', 'otro'])
     .withMessage('Tipo de identificación inválido'),
 
   body('identification.number')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ min: 5, max: 20 })
     .withMessage('El número de identificación debe tener entre 5 y 20 caracteres'),
@@ -345,12 +345,12 @@ const validateTutorUpdate = [
     .normalizeEmail(),
 
   body('identification.type')
-    .optional()
+    .optional({ checkFalsy: true })
     .isIn(['ine', 'cedula', 'pasaporte', 'licencia', 'otro'])
     .withMessage('Tipo de identificación inválido'),
 
   body('identification.number')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ min: 5, max: 20 })
     .withMessage('El número de identificación debe tener entre 5 y 20 caracteres'),
