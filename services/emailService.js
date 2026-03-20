@@ -13,14 +13,15 @@ const nodemailer = require('nodemailer');
 
 // ── Crear transporter ────────────────────────────────────────────────────────
 const crearTransporter = () => {
+  const user = (process.env.EMAIL_USER || '').trim();
+  const pass = (process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || '').trim();
   return nodemailer.createTransport({
     service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
+    auth: { user, pass }
   });
 };
+
+// ── Template HTML base ───────────────────────────────────────────────────────
 
 // ── Template HTML base ───────────────────────────────────────────────────────
 const templateBase = ({ titulo, mensaje, nombreAlumno = '', footer = '' }) => `
@@ -76,8 +77,10 @@ const templateBase = ({ titulo, mensaje, nombreAlumno = '', footer = '' }) => `
 
 // ── Enviar un solo email ─────────────────────────────────────────────────────
 const enviarEmail = async ({ to, subject, titulo, mensaje, nombreAlumno, footer }) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    throw new Error('EMAIL_USER y EMAIL_PASSWORD no están configurados en las variables de entorno');
+  const emailUser = (process.env.EMAIL_USER || '').trim();
+  const emailPass = (process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || '').trim();
+  if (!emailUser || !emailPass) {
+    throw new Error('EMAIL_USER y EMAIL_PASS no están configurados en las variables de entorno del backend');
   }
 
   const transporter = crearTransporter();
@@ -125,8 +128,14 @@ const enviarEmailMasivo = async ({ destinatarios, subject, titulo, mensaje, foot
 
 // ── Verificar conexión SMTP ──────────────────────────────────────────────────
 const verificarConexion = async () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    return { ok: false, error: 'Credenciales no configuradas' };
+  const emailUser = (process.env.EMAIL_USER || '').trim();
+  const emailPass = (process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || '').trim();
+  
+  if (!emailUser || !emailPass) {
+    return { 
+      ok: false, 
+      error: 'Credenciales no configuradas. Verifica EMAIL_USER y EMAIL_PASS en el .env del backend.'
+    };
   }
   try {
     const transporter = crearTransporter();

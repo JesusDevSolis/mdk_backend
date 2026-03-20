@@ -72,9 +72,6 @@ exports.update = async (req, res) => {
   try {
     const notif = await Notificacion.findById(req.params.id);
     if (!notif) return res.status(404).json({ success: false, message: 'Notificación no encontrada' });
-    if (notif.estado === 'enviada') {
-      return res.status(400).json({ success: false, message: 'No se puede editar una notificación ya enviada' });
-    }
     Object.assign(notif, { ...req.body, modificadoPor: req.user._id });
     await notif.save();
     res.json({ success: true, message: 'Notificación actualizada', data: notif });
@@ -88,9 +85,6 @@ exports.delete = async (req, res) => {
   try {
     const notif = await Notificacion.findById(req.params.id);
     if (!notif) return res.status(404).json({ success: false, message: 'Notificación no encontrada' });
-    if (notif.estado === 'enviada') {
-      return res.status(400).json({ success: false, message: 'No se puede eliminar una notificación ya enviada' });
-    }
     await Notificacion.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Notificación eliminada' });
   } catch (error) {
@@ -98,65 +92,104 @@ exports.delete = async (req, res) => {
   }
 };
 
-// ── Resolver destinatarios ────────────────────────────────────────────────────
+// ── Resolver destinatarios ─────────────────────────────────────────────────
+// Regla: menores de 18 → email del tutor; mayores → email del alumno
 const resolverDestinatarios = async (destinatarios) => {
-  let lista = []; // [{ email, nombre }]
-
+  const lista = []; // [{ email, nombre }]
   const { tipo, sucursales, programas, alumnos, tutores } = destinatarios;
 
-  if (tipo === 'todos') {
-    // Alumnos activos con email
-    const als = await Alumno.find({ isActive: true, email: { $exists: true, $ne: null } })
-      .select('firstName lastName email');
-    lista.push(...als.map(a => ({ email: a.email, nombre: `${a.firstName} ${a.lastName}` })));
+  // Función auxiliar: dado un alumno, devuelve { email, nombre } correcto
+  const emailParaAlumno = async (alumno) => {
+    const edad = alumno.age ?? calcularEdad(alumno.dateOfBirth);
+    const esMinor = edad !== null && edad < 18;
 
-    // Tutores activos con email
+    if (esMinor && alumno.tutor) {
+      // Buscar email del tutor
+      const tutorId = typeof alumno.tutor === 'object' ? alumno.tutor._id : alumno.tutor;
+      const tutor = await Tutor.findById(tutorId).select('firstName lastName email').lean();
+      if (tutor?.email) {
+        return { email: tutor.email, nombre: `${tutor.firstName} ${tutor.lastName} (tutor de ${alumno.firstName})` };
+      }
+      // Si el tutor no tiene email, intentar con el alumno si tiene
+      if (alumno.email) {
+        return { email: alumno.email, nombre: `${alumno.firstName} ${alumno.lastName}` };
+      }
+      return null; // sin email disponible
+    }
+
+    if (alumno.email) {
+      return { email: alumno.email, nombre: `${alumno.firstName} ${alumno.lastName}` };
+    }
+    return null;
+  };
+
+  const calcularEdad = (fechaNacimiento) => {
+    if (!fechaNacimiento) return null;
+    const hoy = new Date();
+    const nac = new Date(fechaNacimiento);
+    let edad = hoy.getFullYear() - nac.getFullYear();
+    const m = hoy.getMonth() - nac.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+    return edad;
+  };
+
+  // ── Consultas por tipo ─────────────────────────────────────────────────
+  let alumnosQuery = [];
+
+  if (tipo === 'todos') {
+    alumnosQuery = await Alumno.find({ isActive: true })
+      .select('firstName lastName email dateOfBirth tutor')
+      .populate('tutor', 'firstName lastName email')
+      .lean();
+
+    // También incluir tutores activos directamente
     const tuts = await Tutor.find({ isActive: true, email: { $exists: true, $ne: null } })
-      .select('firstName lastName email');
+      .select('firstName lastName email').lean();
     lista.push(...tuts.map(t => ({ email: t.email, nombre: `${t.firstName} ${t.lastName}` })));
 
   } else if (tipo === 'sucursal' && sucursales?.length) {
-    const als = await Alumno.find({
+    alumnosQuery = await Alumno.find({
       isActive: true,
-      'enrollment.sucursal': { $in: sucursales },
-      email: { $exists: true, $ne: null }
-    }).select('firstName lastName email');
-    lista.push(...als.map(a => ({ email: a.email, nombre: `${a.firstName} ${a.lastName}` })));
-
-    // Tutores de esos alumnos
-    const tutorIds = [...new Set(als.filter(a => a.tutor).map(a => a.tutor?.toString()))];
-    if (tutorIds.length) {
-      const tuts = await Tutor.find({ _id: { $in: tutorIds }, email: { $exists: true, $ne: null } })
-        .select('firstName lastName email');
-      lista.push(...tuts.map(t => ({ email: t.email, nombre: `${t.firstName} ${t.lastName}` })));
-    }
+      'enrollment.sucursal': { $in: sucursales }
+    }).select('firstName lastName email dateOfBirth tutor')
+      .populate('tutor', 'firstName lastName email')
+      .lean();
 
   } else if (tipo === 'programa' && programas?.length) {
-    const als = await Alumno.find({
+    alumnosQuery = await Alumno.find({
       isActive: true,
-      'enrollment.programa': { $in: programas },
-      email: { $exists: true, $ne: null }
-    }).select('firstName lastName email tutor');
-    lista.push(...als.map(a => ({ email: a.email, nombre: `${a.firstName} ${a.lastName}` })));
+      'enrollment.programa': { $in: programas }
+    }).select('firstName lastName email dateOfBirth tutor')
+      .populate('tutor', 'firstName lastName email')
+      .lean();
 
   } else if (tipo === 'manual') {
     if (alumnos?.length) {
-      const als = await Alumno.find({ _id: { $in: alumnos }, email: { $exists: true, $ne: null } })
-        .select('firstName lastName email');
-      lista.push(...als.map(a => ({ email: a.email, nombre: `${a.firstName} ${a.lastName}` })));
+      alumnosQuery = await Alumno.find({ _id: { $in: alumnos } })
+        .select('firstName lastName email dateOfBirth tutor')
+        .populate('tutor', 'firstName lastName email')
+        .lean();
     }
     if (tutores?.length) {
       const tuts = await Tutor.find({ _id: { $in: tutores }, email: { $exists: true, $ne: null } })
-        .select('firstName lastName email');
+        .select('firstName lastName email').lean();
       lista.push(...tuts.map(t => ({ email: t.email, nombre: `${t.firstName} ${t.lastName}` })));
     }
+  }
+
+  // Procesar alumnos aplicando la regla menor/mayor
+  for (const alumno of alumnosQuery) {
+    const dest = await emailParaAlumno(alumno);
+    if (dest) lista.push(dest);
   }
 
   // Eliminar duplicados por email
   const vistos = new Set();
   return lista.filter(d => {
-    if (vistos.has(d.email)) return false;
-    vistos.add(d.email);
+    if (!d.email) return false;
+    const emailNorm = d.email.toLowerCase().trim();
+    if (vistos.has(emailNorm)) return false;
+    vistos.add(emailNorm);
     return true;
   });
 };
@@ -168,7 +201,7 @@ exports.previewDestinatarios = async (req, res) => {
     res.json({
       success: true,
       total: lista.length,
-      preview: lista.slice(0, 10), // primeros 10 como muestra
+      preview: lista.slice(0, 10),
       conEmail: lista.length
     });
   } catch (error) {
@@ -176,14 +209,11 @@ exports.previewDestinatarios = async (req, res) => {
   }
 };
 
-// ── Enviar notificación ───────────────────────────────────────────────────────
+// ── Enviar notificación (permite reenvío) ────────────────────────────────────
 exports.enviar = async (req, res) => {
   try {
     const notif = await Notificacion.findById(req.params.id);
     if (!notif) return res.status(404).json({ success: false, message: 'Notificación no encontrada' });
-    if (notif.estado === 'enviada') {
-      return res.status(400).json({ success: false, message: 'Esta notificación ya fue enviada' });
-    }
 
     // Marcar como enviando
     notif.estado = 'enviando';
@@ -192,7 +222,7 @@ exports.enviar = async (req, res) => {
     // Resolver destinatarios
     const lista = await resolverDestinatarios(notif.destinatarios);
     if (!lista.length) {
-      notif.estado = 'borrador';
+      notif.estado = notif.envio?.fechaEnvio ? 'enviada' : 'borrador';
       await notif.save();
       return res.status(400).json({ success: false, message: 'No hay destinatarios con email válido' });
     }
@@ -205,18 +235,18 @@ exports.enviar = async (req, res) => {
       mensaje:       notif.mensaje
     });
 
-    // Actualizar registro
-    notif.estado              = 'enviada';
+    // Actualizar registro (acumulando si es reenvío)
+    notif.estado                   = 'enviada';
     notif.envio.totalDestinatarios = lista.length;
-    notif.envio.enviados          = resultado.enviados;
-    notif.envio.fallidos          = resultado.fallidos;
-    notif.envio.errores           = resultado.errores;
-    notif.envio.fechaEnvio        = new Date();
+    notif.envio.enviados           = resultado.enviados;
+    notif.envio.fallidos           = resultado.fallidos;
+    notif.envio.errores            = resultado.errores;
+    notif.envio.fechaEnvio         = new Date();
     await notif.save();
 
     res.json({
       success: true,
-      message: `Notificación enviada a ${resultado.enviados} destinatarios`,
+      message: `Notificación enviada a ${resultado.enviados} de ${lista.length} destinatarios`,
       data: {
         enviados: resultado.enviados,
         fallidos: resultado.fallidos,
@@ -225,6 +255,10 @@ exports.enviar = async (req, res) => {
     });
   } catch (error) {
     console.error('Error enviando notificación:', error);
+    // Revertir estado si falla
+    try {
+      await Notificacion.findByIdAndUpdate(req.params.id, { estado: 'borrador' });
+    } catch (_) {}
     res.status(500).json({ success: false, message: 'Error al enviar la notificación', error: error.message });
   }
 };
