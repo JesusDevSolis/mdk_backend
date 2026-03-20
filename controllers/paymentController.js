@@ -1087,16 +1087,18 @@ exports.cobrarConComprobante = async (req, res) => {
       return res.status(400).json({ success: false, message: 'ID de pago inválido' });
     }
 
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'El comprobante de pago es obligatorio'
-      });
+    if (!paymentMethod) {
+      if (req.file) require('fs').unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: 'El método de pago es requerido' });
     }
 
-    if (!paymentMethod) {
-      require('fs').unlinkSync(req.file.path);
-      return res.status(400).json({ success: false, message: 'El método de pago es requerido' });
+    // El comprobante es obligatorio solo para transferencia, depósito y cheque
+    const metodosConComprobante = ['transferencia', 'deposito', 'cheque'];
+    if (metodosConComprobante.includes(paymentMethod) && !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: `Para pagos con ${paymentMethod} el comprobante es obligatorio`
+      });
     }
 
     const payment = await Payment.findById(id);
@@ -1130,16 +1132,18 @@ exports.cobrarConComprobante = async (req, res) => {
       payment.notes = notes;
     }
 
-    // 2 — Adjuntar comprobante
-    payment.receiptFile = {
-      filename     : req.file.filename,
-      originalName : req.file.originalname,
-      mimetype     : req.file.mimetype,
-      size         : req.file.size,
-      url          : `/uploads/documents/${req.file.filename}`,
-      uploadedAt   : new Date(),
-      uploadedBy   : req.user._id
-    };
+    // 2 — Adjuntar comprobante (solo si se subió)
+    if (req.file) {
+      payment.receiptFile = {
+        filename     : req.file.filename,
+        originalName : req.file.originalname,
+        mimetype     : req.file.mimetype,
+        size         : req.file.size,
+        url          : `/uploads/documents/${req.file.filename}`,
+        uploadedAt   : new Date(),
+        uploadedBy   : req.user._id
+      };
+    }
 
     await payment.save();
 
