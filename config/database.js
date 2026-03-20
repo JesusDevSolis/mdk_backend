@@ -11,6 +11,18 @@ const connectDB = async () => {
 
         console.log(`✅ MongoDB conectado: ${conn.connection.host}`);
         console.log(`📊 Base de datos: ${conn.connection.name}`);
+
+        // Inicializar configuraciones por defecto si la BD está vacía
+        try {
+            const Configuracion = require('../models/Configuracion');
+            const count = await Configuracion.countDocuments({ isActive: true });
+            if (count === 0) {
+                await Configuracion.inicializarDefecto();
+                console.log('✅ Configuraciones por defecto inicializadas');
+            }
+        } catch (e) {
+            console.warn('⚠️  No se pudieron inicializar configuraciones:', e.message);
+        }
         
     } catch (error) {
         console.error('❌ Error conectando a MongoDB:', error.message);
