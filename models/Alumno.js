@@ -236,33 +236,31 @@ const alumnoSchema = new mongoose.Schema({
     level: {
       type: String,
       enum: [
-        'blanco',
-        'blanco-amarillo',
-        'amarillo',
-        'amarillo-naranja',
-        'naranja',
-        'naranja-verde',
-        'verde',
-        'verde-azul',
-        'azul',
-        'azul-marron',
-        'marron',
-        'marron-negro',
-        'negro-1',
-        'negro-2',
-        'negro-3',
-        'negro-4',
-        'negro-5',
-        'negro-6',
-        'negro-7',
-        'negro-8',
-        'negro-9'
+        'principiante',
+        'blanca-chobocha',
+        'blanca-1', 'blanca-2', 'blanca-3',
+        'blanca-avanzada',
+        'amarilla', 'amarilla-avanzada',
+        'verde', 'verde-avanzada',
+        'azul', 'azul-avanzada',
+        'marron', 'marron-avanzada',
+        'roja', 'roja-ieby',
+        'negra-1-poom', 'negra-2-poom', 'negra-3-poom',
+        'negra-1-dan', 'negra-2-dan', 'negra-3-dan',
+        'negra-4-dan', 'negra-5-dan', 'negra-6-dan',
+        'negra-7-dan', 'negra-8-dan', 'negra-9-dan',
+        '1-parcial', '2-parcial', '3-parcial',
+        '4-parcial', '5-parcial', '6-parcial',
+        'naranja', 'morada', 'cafe',
+        // Valores legacy para compatibilidad con registros existentes
+        'blanco', 'blanco-amarillo', 'amarillo', 'amarillo-naranja',
+        'naranja-verde', 'verde-azul', 'azul-marron',
+        'marron-negro', 'negro-1', 'negro-2', 'negro-3'
       ],
-      default: 'blanco'
+      default: 'principiante'
     },
     dateObtained: {
-      type: Date,
-      default: Date.now
+      type: Date
     },
     certifiedBy: {
       type: mongoose.Schema.Types.ObjectId,

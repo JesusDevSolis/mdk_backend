@@ -32,22 +32,6 @@ const tutorSchema = new mongoose.Schema({
     enum: ['masculino', 'femenino', 'otro']
   },
 
-  // Documentos de Identificación
-  identification: {
-    type: {
-      type: String,
-      enum: ['ine', 'pasaporte', 'licencia', 'otro'],
-      default: 'ine'
-    },
-    number: {
-      type: String,
-      trim: true,
-      sparse: true,          // permite múltiples documentos sin número (null/undefined)
-      maxlength: [20, 'El número de identificación no puede exceder 20 caracteres'],
-      set: v => (v === '' || v === null) ? undefined : v  // "" → undefined para respetar sparse
-    }
-  },
-
   // Información de Contacto
   email: {
     type: String,
