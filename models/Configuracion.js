@@ -272,9 +272,24 @@ configuracionSchema.statics.getValor = async function(clave, valorDefecto = null
 
 // Establecer valor de una configuración
 configuracionSchema.statics.setValor = async function(clave, valor, usuarioId) {
-    const config = await this.findOne({ clave, isActive: true });
+    let config = await this.findOne({ clave, isActive: true });
+    
+    // Si no existe, crearla automáticamente (upsert)
     if (!config) {
-        throw new Error(`Configuración ${clave} no encontrada`);
+        config = new this({
+            clave,
+            valor,
+            tipo: typeof valor === 'boolean' ? 'boolean'
+                : typeof valor === 'number'  ? 'number'
+                : 'string',
+            categoria: clave.split('_')[0] || 'general',
+            descripcion: clave,
+            valorDefecto: valor,
+            isActive: true,
+            lastModifiedBy: usuarioId
+        });
+        await config.save();
+        return config;
     }
 
     return config.actualizarValor(valor, usuarioId);
