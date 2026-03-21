@@ -74,16 +74,10 @@ const disciplinaSchema = new mongoose.Schema({
         required: [true, 'El slug es requerido'],
         unique: true,
         trim: true,
-        lowercase: true,
-        enum: [
-        'tae-kwon-do',
-        'tang-soo-do',
-        'hapkido',
-        'gumdo',
-        'pequenos-dragones'
-        ]
-        // El slug es el mismo valor que enrollment.programa en Alumno.js
-        // Esto garantiza integridad sin FK formal en Mongo
+        lowercase: true
+        // El slug coincide con enrollment.programa en Alumno.js
+        // para las 5 disciplinas base. Disciplinas personalizadas
+        // tendrán su propio slug único.
     },
     nombre: {
         type: String,
@@ -91,6 +85,20 @@ const disciplinaSchema = new mongoose.Schema({
         trim: true,
         maxlength: [80, 'El nombre no puede exceder 80 caracteres']
         // Ejemplo: 'Tae Kwon Do'
+    },
+
+    // ── Color e ícono para UI ──────────────────────────────────────
+    color: {
+        type: String,
+        trim: true,
+        default: '#6B7280'
+        // Color HEX para la UI: '#3B82F6', '#10B981', etc.
+    },
+    emoji: {
+        type: String,
+        trim: true,
+        default: '🥋'
+        // Emoji representativo de la disciplina
     },
     nombreCoreano: {
         type: String,
