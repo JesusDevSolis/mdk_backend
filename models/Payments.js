@@ -29,6 +29,14 @@ const paymentSchema = new mongoose.Schema({
     index: true
   },
 
+  // ===== REFERENCIA A EXAMEN (opcional) =====
+  examenRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Examen',
+    default: null,
+    index: true
+  },
+
   // ===== INFORMACIÓN DEL PAGO =====
   type: {
     type: String,

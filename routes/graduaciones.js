@@ -8,7 +8,8 @@ const {
     getAllGraduaciones,
     getGraduacionesByExamen,
     getGraduacionesByAlumno,
-    getEstadisticas
+    getEstadisticas,
+    generarCertificado
 } = require('../controllers/graduacionController');
 
 // Importar middleware de autenticación
@@ -84,6 +85,14 @@ router.post(
     '/procesar',
     authenticate,
     procesarGraduaciones
+);
+
+// GET /api/graduaciones/:graduacionId/certificado
+router.get(
+    '/:graduacionId/certificado',
+    authenticate,
+    validateParamId('graduacionId'),
+    generarCertificado
 );
 
 module.exports = router;

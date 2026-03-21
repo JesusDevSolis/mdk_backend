@@ -564,6 +564,25 @@ exports.markAsPaid = async (req, res) => {
       await payment.save();
     }
 
+    // ── Sincronizar pago de examen si este pago está vinculado a un examen ──
+    if (payment.examenRef && payment.alumno) {
+      try {
+        const Examen = require('../models/Examen');
+        await Examen.updateOne(
+          { _id: payment.examenRef, 'alumnosInscritos.alumno': payment.alumno },
+          {
+            $set: {
+              'alumnosInscritos.$.pagoExamen.pagado':      true,
+              'alumnosInscritos.$.pagoExamen.montoPagado': payment.total || payment.amount,
+              'alumnosInscritos.$.pagoExamen.fechaPago':   new Date(),
+            }
+          }
+        );
+      } catch (syncErr) {
+        console.error('Error sincronizando pago con examen:', syncErr.message);
+      }
+    }
+
     const paymentUpdated = await Payment.findById(payment._id)
       .populate('alumno', 'firstName lastName enrollment.studentId')
       .populate('tutor', 'firstName lastName email phones.primary')

@@ -18,7 +18,8 @@ const {
     getCalificacionAlumno,
     getCalificacionesExamen,
     getEstadisticas,
-    getConfiguracionesExamenes // ✅ NUEVO
+    getConfiguracionesExamenes, // ✅ NUEVO
+    sincronizarPagos
 } = require('../controllers/examenController');
 
 // Importar middleware de autenticación
@@ -181,6 +182,15 @@ router.delete(
     isAdmin,
     validateParamId('id'),
     deleteExamen
+);
+
+// POST /api/examenes/:id/sincronizar-pagos — crear pagos pendientes para alumnos inscritos
+router.post(
+    '/:id/sincronizar-pagos',
+    authenticate,
+    isAdmin,
+    validateParamId('id'),
+    sincronizarPagos
 );
 
 module.exports = router;

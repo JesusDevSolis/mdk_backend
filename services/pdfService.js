@@ -728,4 +728,246 @@ const generarReciboCobro = (pago, outputDir) => {
     });
 };
 
-module.exports = { generateSolicitudIngreso, generarReciboCobro };
+// ─────────────────────────────────────────────────────────────────────────────
+// CERTIFICADO DE GRADUACIÓN
+// Genera un certificado oficial en formato horizontal (LETTER landscape)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BELT_DISPLAY_CERT = {
+  'blanco'         : 'Cinturón Blanco',
+  'blanco-amarillo': 'Cinturón Blanco-Amarillo',
+  'amarillo'       : 'Cinturón Amarillo',
+  'amarillo-naranja': 'Cinturón Amarillo-Naranja',
+  'naranja'        : 'Cinturón Naranja',
+  'naranja-verde'  : 'Cinturón Naranja-Verde',
+  'verde'          : 'Cinturón Verde',
+  'verde-azul'     : 'Cinturón Verde-Azul',
+  'azul'           : 'Cinturón Azul',
+  'azul-marron'    : 'Cinturón Azul-Marrón',
+  'marron'         : 'Cinturón Marrón',
+  'marron-negro'   : 'Cinturón Marrón-Negro',
+  'negro-1'        : 'Cinturón Negro — 1° Dan',
+  'negro-2'        : 'Cinturón Negro — 2° Dan',
+  'negro-3'        : 'Cinturón Negro — 3° Dan',
+  'negro-4'        : 'Cinturón Negro — 4° Dan',
+  'negro-5'        : 'Cinturón Negro — 5° Dan',
+  'negro-6'        : 'Cinturón Negro — 6° Dan',
+  'negro-7'        : 'Cinturón Negro — 7° Dan',
+  'negro-8'        : 'Cinturón Negro — 8° Dan',
+  'negro-9'        : 'Cinturón Negro — 9° Dan',
+};
+
+const BELT_COLOR_CERT = {
+  'blanco'         : '#FFFFFF',
+  'blanco-amarillo': '#FEF9C3',
+  'amarillo'       : '#FDE047',
+  'amarillo-naranja': '#FDE047',
+  'naranja'        : '#FB923C',
+  'naranja-verde'  : '#FB923C',
+  'verde'          : '#22C55E',
+  'verde-azul'     : '#22C55E',
+  'azul'           : '#3B82F6',
+  'azul-marron'    : '#3B82F6',
+  'marron'         : '#92400E',
+  'marron-negro'   : '#92400E',
+  'negro-1'        : '#111111',
+  'negro-2'        : '#111111',
+  'negro-3'        : '#111111',
+  'negro-4'        : '#111111',
+  'negro-5'        : '#111111',
+  'negro-6'        : '#111111',
+  'negro-7'        : '#111111',
+  'negro-8'        : '#111111',
+  'negro-9'        : '#111111',
+};
+
+/**
+ * Genera el certificado oficial de graduación
+ * @param {Object} opts.graduacion  - Documento Graduacion populado
+ * @param {Object} opts.alumno      - Documento Alumno
+ * @param {Object} opts.examen      - Documento Examen
+ * @param {Object} opts.instructor  - Nombre del instructor certificador
+ * @param {String} outputDir        - Carpeta destino
+ * @returns {Promise<{filePath, fileName, url}>}
+ */
+const generarCertificadoGraduacion = (opts, outputDir) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const { graduacion, alumno, examen, instructorNombre } = opts;
+      const dir = outputDir || path.join(__dirname, '../uploads/certificados');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      // Datos
+      const nombreCompleto = [alumno.firstName, alumno.lastName, alumno.secondLastName]
+        .filter(Boolean).join(' ').toUpperCase();
+      const cinturonNuevo  = graduacion.cinturonNuevo || examen?.cinturonObjetivo || '';
+      const beltLabel      = BELT_DISPLAY_CERT[cinturonNuevo] || cinturonNuevo;
+      const beltColor      = BELT_COLOR_CERT[cinturonNuevo] || '#c8971e';
+      const fechaGrad      = graduacion.fechaGraduacion
+        ? new Date(graduacion.fechaGraduacion).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+      const disciplina     = alumno.enrollment?.programa
+        ? (PROG[alumno.enrollment.programa]?.label || alumno.enrollment.programa.toUpperCase())
+        : 'TAE KWON DO';
+      const calificacion   = graduacion.calificacionObtenida
+        ? `${Math.round(graduacion.calificacionObtenida * 100) / 100} / 100`
+        : null;
+      const folio          = `CERT-${String(graduacion._id).slice(-8).toUpperCase()}`;
+      const instructor     = instructorNombre || 'Héctor Bedolla Bermúdez';
+      const esNegro        = cinturonNuevo.startsWith('negro');
+
+      // Página LETTER landscape = 792 x 612
+      const W = 792, H = 612;
+      const fileName = `certificado_${folio}.pdf`;
+      const filePath = path.join(dir, fileName);
+      const doc = new PDFDocument({
+        autoFirstPage: true,
+        size: [W, H],
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        info: {
+          Title: `Certificado de Graduación — ${nombreCompleto}`,
+          Author: 'Escuela de Artes Marciales Koreanas "Bedolla"',
+        },
+      });
+      const stream = fs.createWriteStream(filePath);
+      doc.pipe(stream);
+
+      // ── FONDO ────────────────────────────────────────────────────────────────
+      // Fondo blanco cálido
+      doc.rect(0, 0, W, H).fill('#FAFAF8');
+
+      // Borde exterior decorativo doble
+      doc.rect(12, 12, W - 24, H - 24).strokeColor('#c8971e').lineWidth(2).stroke();
+      doc.rect(18, 18, W - 36, H - 36).strokeColor('#c8971e').lineWidth(0.5).stroke();
+
+      // Banda superior navy
+      doc.rect(0, 0, W, 90).fill('#2d3748');
+      // Franja dorada debajo de la banda
+      doc.rect(0, 90, W, 5).fill('#c8971e');
+
+      // Banda inferior navy
+      doc.rect(0, H - 80, W, 80).fill('#2d3748');
+      doc.rect(0, H - 85, W, 5).fill('#c8971e');
+
+      // ── LOGOS en header ──────────────────────────────────────────────────────
+      const programa = alumno.enrollment?.programa || 'tae-kwon-do';
+      const logoFile = (programa === 'pequenos-dragones') ? 'logo-pequenos-dragones.png' : 'logo-mdk.png';
+      try {
+        const lp = path.join(LOGOS_DIR, logoFile);
+        if (fs.existsSync(lp)) doc.image(lp, 28, 8, { fit: [70, 72], align: 'center', valign: 'center' });
+      } catch (_) {}
+      try {
+        const lb = path.join(LOGOS_DIR, 'logo-bedolla.png');
+        if (fs.existsSync(lb)) doc.image(lb, W - 98, 8, { fit: [70, 72], align: 'center', valign: 'center' });
+      } catch (_) {}
+
+      // ── TÍTULO HEADER ────────────────────────────────────────────────────────
+      doc.font('Helvetica-Bold').fontSize(22).fillColor('#FFFFFF')
+         .text('CERTIFICADO DE GRADUACIÓN', 0, 18, { align: 'center', width: W });
+      doc.font('Helvetica').fontSize(9).fillColor('#c8971e')
+         .text('Escuela de Artes Marciales Koreanas "Bedolla"  •  San Cristóbal de las Casas, Chiapas', 0, 46, { align: 'center', width: W });
+      doc.font('Helvetica').fontSize(8).fillColor('#9ca3af')
+         .text(`DISCIPLINA: ${disciplina}`, 0, 62, { align: 'center', width: W });
+
+      // ── CUERPO CENTRAL ───────────────────────────────────────────────────────
+      let y = 115;
+
+      // "Se certifica que"
+      doc.font('Helvetica').fontSize(13).fillColor('#4B5563')
+         .text('Se certifica que', 0, y, { align: 'center', width: W });
+      y += 26;
+
+      // Nombre del alumno — grande y prominente
+      doc.font('Helvetica-Bold').fontSize(32).fillColor('#2d3748')
+         .text(nombreCompleto, 60, y, { align: 'center', width: W - 120, lineGap: 2 });
+      y += 54;
+
+      // Línea divisoria dorada
+      const lineX1 = W / 2 - 140, lineX2 = W / 2 + 140;
+      doc.moveTo(lineX1, y).lineTo(W / 2 - 16, y).strokeColor('#c8971e').lineWidth(1).stroke();
+      doc.moveTo(W / 2 + 16, y).lineTo(lineX2, y).strokeColor('#c8971e').lineWidth(1).stroke();
+      // Diamante central
+      doc.moveTo(W / 2, y - 4).lineTo(W / 2 + 8, y)
+         .lineTo(W / 2, y + 4).lineTo(W / 2 - 8, y)
+         .closePath().fill('#c8971e');
+      y += 18;
+
+      // "ha demostrado…"
+      doc.font('Helvetica').fontSize(12).fillColor('#4B5563')
+         .text('ha demostrado dedicación, disciplina y habilidad en las artes marciales, habiendo', 60, y, { align: 'center', width: W - 120 });
+      y += 20;
+      doc.text('superado satisfactoriamente el examen de promoción de grado, siendo acreedor al:', 60, y, { align: 'center', width: W - 120 });
+      y += 28;
+
+      // CINTURÓN — rectángulo del color del cinturón
+      const cintW = 280, cintH = 36;
+      const cintX = (W - cintW) / 2;
+      const isBeltLight = ['blanco', 'blanco-amarillo', 'amarillo', 'amarillo-naranja'].includes(cinturonNuevo);
+      doc.roundedRect(cintX, y, cintW, cintH, 8)
+         .fillAndStroke(beltColor, '#c8971e');
+      // Texto del cinturón
+      const cintTextColor = isBeltLight ? '#2d3748' : '#FFFFFF';
+      doc.font('Helvetica-Bold').fontSize(16).fillColor(cintTextColor)
+         .text(beltLabel.toUpperCase(), cintX, y + 10, { align: 'center', width: cintW, lineBreak: false });
+      y += cintH + 8;
+
+      // Calificación si existe
+      if (calificacion) {
+        doc.font('Helvetica').fontSize(10).fillColor('#6B7280')
+           .text(`Calificación obtenida: ${calificacion}`, 0, y, { align: 'center', width: W });
+        y += 16;
+      }
+
+      // Fecha
+      doc.font('Helvetica').fontSize(10).fillColor('#6B7280')
+         .text(`San Cristóbal de las Casas, Chiapas, a ${fechaGrad}`, 0, y, { align: 'center', width: W });
+      y += 20;
+
+      // Folio pequeño
+      doc.font('Helvetica').fontSize(7.5).fillColor('#9CA3AF')
+         .text(`Folio: ${folio}`, 0, y, { align: 'center', width: W });
+
+      // ── FIRMAS (en la banda inferior) ────────────────────────────────────────
+      const firmaY = H - 68;
+      // Firma izquierda — instructor
+      const f1X = 120;
+      doc.moveTo(f1X, firmaY).lineTo(f1X + 160, firmaY)
+         .strokeColor('#c8971e').lineWidth(0.8).stroke();
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#FFFFFF')
+         .text(instructor.toUpperCase(), f1X, firmaY + 5, { width: 160, align: 'center' });
+      doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF')
+         .text('Instructor Certificador', f1X, firmaY + 17, { width: 160, align: 'center' });
+
+      // Firma derecha — director
+      const f2X = W - 290;
+      doc.moveTo(f2X, firmaY).lineTo(f2X + 160, firmaY)
+         .strokeColor('#c8971e').lineWidth(0.8).stroke();
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#FFFFFF')
+         .text('HÉCTOR BEDOLLA BERMÚDEZ', f2X, firmaY + 5, { width: 160, align: 'center' });
+      doc.font('Helvetica').fontSize(8).fillColor('#9CA3AF')
+         .text('Director General', f2X, firmaY + 17, { width: 160, align: 'center' });
+
+      // Sello central (círculo decorativo)
+      const selloX = W / 2, selloY = firmaY + 14;
+      doc.circle(selloX, selloY, 22).strokeColor('#c8971e').lineWidth(1.5).stroke();
+      doc.circle(selloX, selloY, 17).strokeColor('#c8971e').lineWidth(0.5).stroke();
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#c8971e')
+         .text('MDK', selloX - 10, selloY - 6, { width: 20, align: 'center' });
+      doc.font('Helvetica').fontSize(5).fillColor('#c8971e')
+         .text('BEDOLLA', selloX - 12, selloY + 1, { width: 24, align: 'center' });
+
+      // ── WEBSITE pie ──────────────────────────────────────────────────────────
+      doc.font('Helvetica').fontSize(7.5).fillColor('#6B7280')
+         .text('www.ambedolla.com  •  artesmarcialesbedolla@gmail.com', 0, H - 18, { align: 'center', width: W });
+
+      doc.end();
+      stream.on('finish', () => resolve({ filePath, fileName, url: `/uploads/certificados/${fileName}` }));
+      stream.on('error', reject);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+// Re-exportar incluyendo el nuevo certificado
+module.exports = { generateSolicitudIngreso, generarReciboCobro, generarCertificadoGraduacion };

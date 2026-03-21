@@ -48,58 +48,18 @@ const examenSchema = new mongoose.Schema({
     // Cinturón Objetivo (para exámenes de graduación)
     cinturonObjetivo: {
         type: String,
-        enum: [
-            'blanco-amarillo',
-            'amarillo',
-            'amarillo-naranja',
-            'naranja',
-            'naranja-verde',
-            'verde',
-            'verde-azul',
-            'azul',
-            'azul-marron',
-            'marron',
-            'marron-negro',
-            'negro-1',
-            'negro-2',
-            'negro-3',
-            'negro-4',
-            'negro-5',
-            'negro-6',
-            'negro-7',
-            'negro-8',
-            'negro-9'
-        ],
+        trim: true,
+        // Sin enum — acepta cualquier clave de cinturón definida en configuraciones
         required: function() {
-        return this.tipo === 'graduacion';
+            return this.tipo === 'graduacion';
         }
     },
 
     // Cinturón Actual Requerido (para filtrar alumnos elegibles)
     cinturonActualRequerido: {
         type: String,
-        enum: [
-            'blanco',
-            'blanco-amarillo',
-            'amarillo',
-            'amarillo-naranja',
-            'naranja',
-            'naranja-verde',
-            'verde',
-            'verde-azul',
-            'azul',
-            'azul-marron',
-            'marron',
-            'marron-negro',
-            'negro-1',
-            'negro-2',
-            'negro-3',
-            'negro-4',
-            'negro-5',
-            'negro-6',
-            'negro-7',
-            'negro-8'
-        ],
+        trim: true,
+        // Sin enum — acepta cualquier clave de cinturón definida en configuraciones
         required: function() {
             return this.tipo === 'graduacion';
         }
@@ -260,7 +220,7 @@ const examenSchema = new mongoose.Schema({
     // Estado del Examen
     estado: {
         type: String,
-        enum: ['programado', 'en_proceso', 'completado', 'cancelado'],
+        enum: ['programado', 'en_proceso', 'en_curso', 'completado', 'cancelado'],
         default: 'programado'
     },
 

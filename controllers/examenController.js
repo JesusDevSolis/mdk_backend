@@ -3,7 +3,8 @@ const Calificacion = require('../models/Calificacion');
 const Graduacion = require('../models/Graduacion');
 const Alumno = require('../models/Alumno');
 const User = require('../models/User');
-const Configuracion = require('../models/Configuracion'); // ✅ NUEVO
+const Configuracion = require('../models/Configuracion');
+const Payment     = require('../models/Payments'); // ✅ NUEVO
 const mongoose = require('mongoose');
 
 // ✅ NUEVO: Función helper para obtener valores de configuración
@@ -356,11 +357,16 @@ exports.inscribirAlumno = async (req, res) => {
             });
         }
 
-        if (examen.tipo === 'graduacion') {
+        if (examen.tipo === 'graduacion' && examen.cinturonActualRequerido && !autorizadoSinPago) {
             if (alumno.belt.level !== examen.cinturonActualRequerido) {
+                // Solo bloquear si cinturonActualRequerido está definido y no hay autorización
+                // Advertir pero no bloquear — el admin puede inscribir con autorizarSinPago=true
                 return res.status(400).json({
                     success: false,
-                    message: `El alumno debe tener cinturón ${examen.cinturonActualRequerido} para inscribirse`
+                    message: `El alumno debe tener cinturón ${examen.cinturonActualRequerido} para inscribirse. Si desea inscribirlo de todas formas, active "Autorizar sin requisitos".`,
+                    requisito: 'cinturon',
+                    cinturonRequerido: examen.cinturonActualRequerido,
+                    cinturonActual: alumno.belt.level
                 });
             }
         }
@@ -400,13 +406,72 @@ exports.inscribirAlumno = async (req, res) => {
             motivoAutorizacion: motivoAutorizacion || ''
         });
 
+        // ── Crear pago pendiente si el examen tiene costo ──────────────────
+        const costoExamen = Number(examen.requisitos?.costoExamen) || 0
+        let pagoCreado = null
+        let pagoError  = null
+        if (costoExamen > 0) {
+            try {
+                const descuentoPct = Number(descuento) || 0
+                const montoFinal   = Math.round((costoExamen - (costoExamen * descuentoPct / 100)) * 100) / 100
+
+                const pagoExistente = await Payment.findOne({
+                    alumno:    new mongoose.Types.ObjectId(alumnoId),
+                    examenRef: new mongoose.Types.ObjectId(id),
+                    isActive:  true
+                })
+
+                if (!pagoExistente) {
+                    // Usar fecha del examen como dueDate (mínimo hoy para evitar estado vencido)
+                    const hoy = new Date()
+                    hoy.setHours(23, 59, 59, 0)
+                    const fechaExamen = examen.fecha ? new Date(examen.fecha) : hoy
+                    // Si la fecha ya pasó, usar mañana como dueDate
+                    const dueDate = fechaExamen < new Date() ? hoy : fechaExamen
+
+                    pagoCreado = await Payment.create({
+                        alumno:      new mongoose.Types.ObjectId(alumnoId),
+                        sucursal:    examen.sucursal,
+                        type:        'examen',
+                        description: `Pago de examen: ${examen.nombre}`,
+                        amount:      montoFinal,
+                        total:       montoFinal,
+                        status:      'pendiente',
+                        dueDate:     dueDate,
+                        examenRef:   new mongoose.Types.ObjectId(id),
+                        period: {
+                            month: dueDate.getMonth() + 1,
+                            year:  dueDate.getFullYear(),
+                        },
+                        createdBy: req.user._id,
+                        isActive:  true,
+                    })
+                    console.log(`✅ Pago de examen creado: ${pagoCreado._id} para alumno ${alumnoId}`)
+                } else {
+                    console.log(`ℹ️  Ya existe pago de examen para alumno ${alumnoId}`)
+                }
+            } catch (pagoErr) {
+                pagoError = pagoErr.message
+                console.error('=== ERROR CREANDO PAGO DE EXAMEN ===')
+                console.error('Mensaje:', pagoErr.message)
+                if (pagoErr.errors) {
+                    Object.keys(pagoErr.errors).forEach(k => {
+                        console.error(`  Campo "${k}": ${pagoErr.errors[k].message}`)
+                    })
+                }
+            }
+        }
+
         const examenActualizado = await Examen.findById(id)
             .populate('alumnosInscritos.alumno', 'firstName lastName belt')
             .lean();
 
         res.status(200).json({
             success: true,
-            message: 'Alumno inscrito exitosamente',
+            message: pagoError
+                ? `Alumno inscrito exitosamente (aviso: pago no generado — ${pagoError})`
+                : 'Alumno inscrito exitosamente',
+            pagoCreado: pagoCreado ? { id: pagoCreado._id, monto: pagoCreado.total } : null,
             data: examenActualizado
         });
     } catch (error) {
@@ -604,9 +669,12 @@ exports.getAlumnosElegibles = async (req, res) => {
 exports.cambiarEstado = async (req, res) => {
     try {
         const { id } = req.params;
-        const { estado } = req.body;
+        let { estado } = req.body;
 
-        const estadosValidos = ['programado', 'en_proceso', 'completado', 'cancelado'];
+        // Aceptar ambas variantes: 'en_curso' (frontend) y 'en_proceso' (legacy)
+        const estadosValidos = ['programado', 'en_proceso', 'en_curso', 'completado', 'cancelado'];
+        // Normalizar: en_curso → en_proceso para consistencia en BD
+        if (estado === 'en_curso') estado = 'en_proceso';
         
         if (!estadosValidos.includes(estado)) {
             return res.status(400).json({
@@ -749,6 +817,36 @@ exports.calificarAlumno = async (req, res) => {
             });
         }
 
+        // ── Verificar pago si el examen tiene costo ─────────────────────────
+        const costoExamen = examen.requisitos?.costoExamen || 0
+        if (costoExamen > 0 && !inscripcion.autorizadoSinPago) {
+            // Verificar contra Payment directamente (fuente de verdad)
+            const pagoPendiente = await Payment.findOne({
+                alumno:    alumnoId,
+                examenRef: id,
+                status:    'pagado',
+                isActive:  true
+            })
+            // También verificar el flag en el subdocumento (para compatibilidad)
+            const pagadoEnSubdoc = inscripcion.pagoExamen?.pagado || false
+
+            if (!pagoPendiente && !pagadoEnSubdoc) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El alumno no ha pagado el examen ($${costoExamen}). Registra el pago en la sección Pagos antes de calificar.`,
+                    codigo: 'PAGO_PENDIENTE'
+                })
+            }
+
+            // Si el pago existe en Payment pero el subdocumento no está actualizado, sincronizar
+            if (pagoPendiente && !pagadoEnSubdoc) {
+                inscripcion.pagoExamen.pagado      = true
+                inscripcion.pagoExamen.montoPagado = pagoPendiente.total || costoExamen
+                inscripcion.pagoExamen.fechaPago   = pagoPendiente.paidDate || new Date()
+                await examen.save()
+            }
+        }
+
         // ✅ Obtener calificación mínima de configuración
         const calificacionMinima = await getConfigValue('examen_calificacion_minima', 60);
 
@@ -867,12 +965,35 @@ exports.getCalificacionesExamen = async (req, res) => {
         .populate('evaluadoPor', 'name email')
         .sort({ calificacionFinal: -1 });
 
+        // Enriquecer con datos de graduación para cada calificación aprobada
+        const Graduacion = require('../models/Graduacion');
+        const graduaciones = await Graduacion.find({ examen: id, isActive: true })
+            .select('alumno cinturonNuevo estado _id')
+            .lean();
+
+        // Mapa alumnoId → graduación
+        const gradMap = {};
+        graduaciones.forEach(g => { gradMap[g.alumno.toString()] = g; });
+
+        const calificacionesEnriquecidas = calificaciones.map(c => {
+            const obj = c.toObject ? c.toObject() : { ...c };
+            const grad = gradMap[obj.alumno?._id?.toString()];
+            if (grad) {
+                obj.graduacionId  = grad._id;
+                obj.cinturonNuevo = grad.cinturonNuevo;
+                obj.graduado      = true;
+            } else {
+                obj.graduado = false;
+            }
+            return obj;
+        });
+
         const estadisticas = await Calificacion.getEstadisticasExamen(id);
 
         res.status(200).json({
             success: true,
             data: {
-                calificaciones,
+                calificaciones: calificacionesEnriquecidas,
                 estadisticas
             }
         });
@@ -887,3 +1008,88 @@ exports.getCalificacionesExamen = async (req, res) => {
 };
 
 module.exports = exports;
+// ========================================
+// SINCRONIZAR PAGOS DE ALUMNOS INSCRITOS
+// Crea pagos pendientes para alumnos inscritos que no los tienen aún
+// ========================================
+exports.sincronizarPagos = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const examen = await Examen.findById(id)
+            .populate('alumnosInscritos.alumno', 'firstName lastName enrollment.sucursal')
+
+        if (!examen) {
+            return res.status(404).json({ success: false, message: 'Examen no encontrado' })
+        }
+
+        const costoExamen = examen.requisitos?.costoExamen || 0
+        if (costoExamen === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'Este examen no tiene costo, no se requieren pagos',
+                creados: 0
+            })
+        }
+
+        const fechaExamen = examen.fecha ? new Date(examen.fecha) : new Date()
+        let creados = 0
+        const errores = []
+
+        for (const inscripcion of examen.alumnosInscritos) {
+            const alumnoId = inscripcion.alumno?._id || inscripcion.alumno
+            if (!alumnoId) continue
+
+            try {
+                const yaExiste = await Payment.findOne({
+                    alumno: alumnoId,
+                    examenRef: id,
+                    isActive: true
+                })
+
+                if (!yaExiste) {
+                    const mongoose = require('mongoose')
+                    const descPct  = Number(inscripcion.pagoExamen?.descuentoAplicado) || 0
+                    const monto    = Math.round((costoExamen - (costoExamen * descPct / 100)) * 100) / 100
+                    // dueDate: si la fecha del examen ya pasó, usar hoy al final del día
+                    const hoy = new Date()
+                    hoy.setHours(23, 59, 59, 0)
+                    const dueDate = fechaExamen < new Date() ? hoy : fechaExamen
+                    const sucursalPago = examen.sucursal 
+                        || inscripcion.alumno?.enrollment?.sucursal
+                        || null
+                    await Payment.create({
+                        alumno:      new mongoose.Types.ObjectId(alumnoId.toString()),
+                        sucursal:    sucursalPago,
+                        type:        'examen',
+                        description: `Pago de examen: ${examen.nombre}`,
+                        amount:      monto,
+                        total:       monto,
+                        status:      inscripcion.pagoExamen?.pagado ? 'pagado' : 'pendiente',
+                        dueDate:     dueDate,
+                        examenRef:   new mongoose.Types.ObjectId(id),
+                        period: {
+                            month: dueDate.getMonth() + 1,
+                            year:  dueDate.getFullYear(),
+                        },
+                        createdBy: req.user._id,
+                        isActive:  true,
+                    })
+                    creados++
+                    console.log(`✅ Pago sincronizado para alumno ${alumnoId}`)
+                }
+            } catch (err) {
+                errores.push({ alumnoId, error: err.message })
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `${creados} pago(s) creado(s)${errores.length ? `, ${errores.length} error(es)` : ''}`,
+            creados,
+            errores
+        })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}

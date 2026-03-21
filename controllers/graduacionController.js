@@ -355,3 +355,58 @@ exports.getEstadisticas = async (req, res) => {
 };
 
 module.exports = exports;
+// ========================================
+// GENERAR CERTIFICADO PDF DE GRADUACIÓN
+// ========================================
+exports.generarCertificado = async (req, res) => {
+    try {
+        const { graduacionId } = req.params;
+
+        // Buscar la graduación con todos los datos
+        const graduacion = await Graduacion.findById(graduacionId)
+            .populate('alumno', 'firstName lastName secondLastName enrollment belt profilePhoto dateOfBirth')
+            .populate('examen', 'nombre tipo cinturonObjetivo fecha')
+            .populate('certificadoPor', 'name email')
+            .populate('calificacion', 'calificacionFinal resultado');
+
+        if (!graduacion) {
+            return res.status(404).json({ success: false, message: 'Graduación no encontrada' });
+        }
+
+        if (!graduacion.alumno) {
+            return res.status(400).json({ success: false, message: 'Alumno no encontrado en la graduación' });
+        }
+
+        // Obtener nombre del instructor certificador
+        const instructorNombre = graduacion.certificadoPor?.length > 0
+            ? graduacion.certificadoPor[0]?.name
+            : req.user?.name || 'Héctor Bedolla Bermúdez';
+
+        const { generarCertificadoGraduacion } = require('../services/pdfService');
+        const path = require('path');
+        const outputDir = path.join(__dirname, '../uploads/certificados');
+
+        const { filePath, fileName } = await generarCertificadoGraduacion(
+            {
+                graduacion,
+                alumno: graduacion.alumno,
+                examen: graduacion.examen,
+                instructorNombre,
+            },
+            outputDir
+        );
+
+        // Enviar el archivo como descarga
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        const fs = require('fs');
+        const stream = fs.createReadStream(filePath);
+        stream.pipe(res);
+        stream.on('error', () => {
+            res.status(500).json({ success: false, message: 'Error al leer el certificado generado' });
+        });
+    } catch (error) {
+        console.error('Error generando certificado:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

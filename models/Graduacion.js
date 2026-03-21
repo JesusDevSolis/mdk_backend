@@ -36,56 +36,16 @@ const graduacionSchema = new mongoose.Schema({
     // Información del Cinturón
     cinturonAnterior: {
         type: String,
+        trim: true,
         required: [true, 'El cinturón anterior es requerido'],
-        enum: [
-            'blanco',
-            'blanco-amarillo',
-            'amarillo',
-            'amarillo-naranja',
-            'naranja',
-            'naranja-verde',
-            'verde',
-            'verde-azul',
-            'azul',
-            'azul-marron',
-            'marron',
-            'marron-negro',
-            'negro-1',
-            'negro-2',
-            'negro-3',
-            'negro-4',
-            'negro-5',
-            'negro-6',
-            'negro-7',
-            'negro-8'
-        ]
+        // Sin enum — acepta cualquier clave definida en configuraciones
     },
 
     cinturonNuevo: {
         type: String,
+        trim: true,
         required: [true, 'El cinturón nuevo es requerido'],
-        enum: [
-            'blanco-amarillo',
-            'amarillo',
-            'amarillo-naranja',
-            'naranja',
-            'naranja-verde',
-            'verde',
-            'verde-azul',
-            'azul',
-            'azul-marron',
-            'marron',
-            'marron-negro',
-            'negro-1',
-            'negro-2',
-            'negro-3',
-            'negro-4',
-            'negro-5',
-            'negro-6',
-            'negro-7',
-            'negro-8',
-            'negro-9'
-        ]
+        // Sin enum — acepta cualquier clave definida en configuraciones
     },
 
     // Fecha de Graduación
